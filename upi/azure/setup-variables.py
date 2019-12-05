@@ -20,8 +20,10 @@ ignstr = json.dumps(dict(**ign.toDict()))
 
 with open("master.ign", "r") as ignFile:
     master_ignition = json.load(ignFile)
-with open("gw/worker.ign", "r") as ignFile:
+
+with open("worker.ign", "r") as ignFile:
     worker_ignition = json.load(ignFile)
+
 with open("azuredeploy.parameters.json", "r") as jsonFile:
     data = DotMap(json.load(jsonFile))
 

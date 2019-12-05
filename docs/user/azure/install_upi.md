@@ -22,11 +22,7 @@ This creates:
 * all prerequisites from [README](README.md)
 * the following binaries installed and in $PATH:
   * [openshift-install][openshiftinstall]
-<<<<<<< HEAD
   * [az (Azure CLI)][azurecli] installed and aunthenticated
-=======
-  * [az (Azure CLI)][azurecli]
->>>>>>> 848cee28f... Moved install configs, manifests, and ignition configs out of scripts to docs
   * python3
   * [jq][jqjson]
   * [yq][yqyaml]
