@@ -10,13 +10,11 @@ echo "Using resource group $1"
 rm -r -f gw
 mkdir gw
 cp install-config.yaml gw
-openshift-install create manifests --dir=gw
 mkdir -p gw/archive/manifests/original
 cp gw/manifests/* gw/archive/manifests/original
 rm -f gw/openshift/99_openshift-cluster-api_master-machines-*
 rm -f gw/openshift/99_openshift-cluster-api_worker-machineset-*
 python3 setup-manifests.py $1
-./setup-host-network.sh
 cp gw/manifests/* gw/archive/manifests/
 openshift-install create ignition-configs --dir=gw
 mkdir -p ~/.kube
