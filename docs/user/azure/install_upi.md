@@ -6,12 +6,27 @@ completing these steps or to help model your own. You are also free to create
 the required resources through other methods; the templates are just an
 example.
 
+## Overview
+
+This creates:
+
+    A Resource Group
+    3 Masters
+    3-16 Workers
+    A API Loadbalancer
+    A Application Loadbalancer
+    2 Availablity Groups
+
 ## Prerequisites
 
 * all prerequisites from [README](README.md)
 * the following binaries installed and in $PATH:
   * [openshift-install][openshiftinstall]
+<<<<<<< HEAD
   * [az (Azure CLI)][azurecli] installed and aunthenticated
+=======
+  * [az (Azure CLI)][azurecli]
+>>>>>>> 848cee28f... Moved install configs, manifests, and ignition configs out of scripts to docs
   * python3
   * [jq][jqjson]
   * [yq][yqyaml]

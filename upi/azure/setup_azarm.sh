@@ -6,20 +6,6 @@ export AZREGION="centralus"
 export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/"
 export VHD_NAME="rhcos-42.80.20191002.0.vhd"
 
-echo "Using resource group $1"
-rm -r -f gw
-mkdir gw
-cp install-config.yaml gw
-mkdir -p gw/archive/manifests/original
-cp gw/manifests/* gw/archive/manifests/original
-rm -f gw/openshift/99_openshift-cluster-api_master-machines-*
-rm -f gw/openshift/99_openshift-cluster-api_worker-machineset-*
-python3 setup-manifests.py $1
-cp gw/manifests/* gw/archive/manifests/
-openshift-install create ignition-configs --dir=gw
-mkdir -p ~/.kube
-cp gw/auth/kubeconfig ~/.kube/config
-
 echo "Delete old resource group"
 az group delete --name $1 --yes
 
