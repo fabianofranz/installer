@@ -1,3 +1,5 @@
+#!/bin/bash
+
 cat > gw/manifests/ingress-controller-02-default.yaml <<EOF
 apiVersion: operator.openshift.io/v1
 kind: IngressController
