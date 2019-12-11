@@ -17,9 +17,6 @@
     "ignition" : {
       "type" : "string"
     },
-    "baseTemplateUrl" : {
-      "type" : "string"
-    },
     "imageReference" : {
       "type" : "string",
       "metadata" : {

@@ -194,10 +194,7 @@
     }
   },
   "variables" : {
-    "gituser" : "openshift",
-    "branch" : "master",
-    "version" : "azure",
-    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi',variables('version'),'/')]",
+    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/fabianofranz/installer/cors-1249-azure-upi/upi/azure/')]",
     "baseVMachineTemplateUriNode" : "[concat(variables('baseTemplateUrl'), 'node.json')]",
     "baseVMachineTemplateUriMaster" : "[concat(variables('baseTemplateUrl'), 'master.json')]",
     "location" : "[resourceGroup().location]",
@@ -208,17 +205,9 @@
     "mastersubnetName" : "masterSubnet",
     "mastersubnetPrefix" : "10.0.0.0/24",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
-    "vhdStorageType" : "Premium_LRS",
     "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "nodeSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('nodesubnetName'))]",
     "masterSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('mastersubnetName'))]",
-    "rhel" : {
-      "publisher" : "Redhat",
-      "offer" : "RHEL",
-      "sku" : "7-RAW",
-      "version" : "latest"
-    },
-    "baseVMachineTemplateUriBastion" : "[concat(variables('baseTemplateUrl'), 'bastion.json')]",
     "vmSizesMap" : {
       "Standard_A2" : {
         "storageAccountType" : "Standard_LRS"
@@ -434,14 +423,11 @@
         "storageAccountType" : "Standard_LRS"
       }
     },
-    "tenantId" : "[subscription().tenantId]",
-    "bastionVMSize" : "Standard_DS1_v2",
     "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
     "masterPublicIpAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses', resourceGroup().name)]",
     "masterLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
     "masterLbFrontEndConfigId" : "[concat(variables('masterLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
     "masterLbBackendPoolId" : "[concat(variables('masterLbId'),'/backendAddressPools/loadBalancerBackend')]",
-    "masterLbHttpProbeId" : "[concat(variables('masterLbId'),'/probes/httpProbe')]",
     "masterLb6443ProbeId" : "[concat(variables('masterLbId'),'/probes/6443Probe')]",
     "infraPublicIpName" : "[concat(resourceGroup().name,'app')]",
     "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]",
@@ -451,16 +437,9 @@
     "infraLbBackendPoolId" : "[concat(variables('infraLbId'),'/backendAddressPools/AppLoadBalancerBackend')]",
     "infraLbHttpProbeId" : "[concat(variables('infraLbId'),'/probes/httpProbe')]",
     "infraLbHttpsProbeId" : "[concat(variables('infraLbId'),'/probes/httpsProbe')]",
-    "infraLbCockpitProbeId" : "[concat(variables('infraLbId'),'/probes/cockpitProbe')]",
-    "StorageAccountPersistentVolume" : "[concat('sapv', resourceGroup().name)]",
-    "registryStorageName" : "[concat('sareg', resourceGroup().name)]",
     "apiVersion" : "2015-06-15",
     "apiVersionCompute" : "2015-06-15",
     "apiVersionNetwork" : "2016-03-30",
-    "tmApiVersion" : "2015-11-01",
-    "apiVersionStorage" : "2015-06-15",
-    "apiVersionLinkTemplate" : "2015-01-01",
-    "sshKeyPath" : "[concat('/home/','core','/.ssh/authorized_keys')]",
     "intLoadBalancerName" : "[concat(resourceGroup().name, 'intlb')]",
     "intLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName'))]",
     "intLbBackendPoolId" : "[concat(variables('intLbId'),'/backendAddressPools/masters')]",
@@ -541,9 +520,6 @@
           "ignition" : {
             "value" : "[parameters('BootstrapIgnition')]"
           },
-          "baseTemplateUrl" : {
-            "value" : "[variables('baseTemplateUrl')]"
-          },
           "imageReference" : {
             "value" : "[parameters('image')]"
           },
@@ -596,9 +572,6 @@
           "ignition" : {
             "value" : "[parameters('WorkerIgnition')]"
           },
-          "baseTemplateUrl" : {
-            "value" : "[variables('baseTemplateUrl')]"
-          },
           "imageReference" : {
             "value" : "[parameters('image')]"
           },
@@ -646,9 +619,6 @@
           },
           "ignition" : {
             "value" : "[parameters('MasterIgnition')]"
-          },
-          "baseTemplateUrl" : {
-            "value" : "[variables('baseTemplateUrl')]"
           },
           "imageReference" : {
             "value" : "[parameters('image')]"
@@ -701,9 +671,6 @@
           "ignition" : {
             "value" : "[parameters('MasterIgnition')]"
           },
-          "baseTemplateUrl" : {
-            "value" : "[variables('baseTemplateUrl')]"
-          },
           "imageReference" : {
             "value" : "[parameters('image')]"
           },
@@ -754,9 +721,6 @@
           },
           "ignition" : {
             "value" : "[parameters('MasterIgnition')]"
-          },
-          "baseTemplateUrl" : {
-            "value" : "[variables('baseTemplateUrl')]"
           },
           "imageReference" : {
             "value" : "[parameters('image')]"
