@@ -19,6 +19,9 @@
     },
     "sshKeyData" : {
       "value" : ""
+    },
+    "storageAccountName" : {
+      "value" : ""
     }
   }
 }

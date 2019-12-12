@@ -42,6 +42,12 @@
         "description" : "SSH RSA public key file as a string."
       }
     },
+    "storageAccountName" : {
+      "type" : "string",
+      "metadata" : {
+        "description" : "Name of the storage account"
+      }
+    },
     "masterVMSize" : {
       "type" : "string",
       "defaultValue" : "Standard_D8_v3",
@@ -204,7 +210,7 @@
     "nodesubnetPrefix" : "10.0.1.0/24",
     "mastersubnetName" : "masterSubnet",
     "mastersubnetPrefix" : "10.0.0.0/24",
-    "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
+    "nodeStorageName" : "[parameters('storageAccountName')]",
     "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "nodeSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('nodesubnetName'))]",
     "masterSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('mastersubnetName'))]",
