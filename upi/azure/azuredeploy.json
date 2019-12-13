@@ -42,12 +42,6 @@
         "description" : "SSH RSA public key file as a string."
       }
     },
-    "storageAccountName" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "Name of the storage account"
-      }
-    },
     "masterVMSize" : {
       "type" : "string",
       "defaultValue" : "Standard_D8_v3",
@@ -200,7 +194,9 @@
     }
   },
   "variables" : {
-    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/fabianofranz/installer/cors-1249-azure-upi/upi/azure/')]",
+    "gituser" : "fabianofranz",
+    "branch" : "cors-1249-azure-upi",
+    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
     "baseVMachineTemplateUriNode" : "[concat(variables('baseTemplateUrl'), 'node.json')]",
     "baseVMachineTemplateUriMaster" : "[concat(variables('baseTemplateUrl'), 'master.json')]",
     "location" : "[resourceGroup().location]",
@@ -210,7 +206,7 @@
     "nodesubnetPrefix" : "10.0.1.0/24",
     "mastersubnetName" : "masterSubnet",
     "mastersubnetPrefix" : "10.0.0.0/24",
-    "nodeStorageName" : "[parameters('storageAccountName')]",
+    "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
     "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "nodeSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('nodesubnetName'))]",
     "masterSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('mastersubnetName'))]",
@@ -455,16 +451,7 @@
   },
   "resources" : [
     {
-      "type" : "Microsoft.Storage/storageAccounts",
-      "name" : "[variables('nodeStorageName')]",
-      "apiVersion" : "[variables('apiVersion')]",
-      "location" : "[variables('location')]",
-      "properties" : {
-        "accountType" : "[variables('vmSizesMap')[parameters('nodeVmSize')].storageAccountType]"
-      }
-    },
-    {
-      "apiVersion" : "[variables('apiVersion')]",
+      "apiVersion" : "2015-06-15",
       "type" : "Microsoft.Network/virtualNetworks",
       "name" : "[variables('virtualNetworkName')]",
       "location" : "[variables('location')]",
@@ -491,259 +478,6 @@
             }
           }
         ]
-      }
-    },
-    {
-      "name" : "bootstrap",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "dependsOn" : [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
-      ],
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "bootstrap-0"
-          },
-          "dnsName" : {
-            "value" : "[concat(resourceGroup().name,'m1')]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('BootstrapIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "['masteravailabilityset']"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          },
-          "ipAddress" : {
-            "value" : "10.0.0.4"
-          }
-        }
-      }
-    },
-    {
-      "name" : "[concat('node', copyindex())]",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "copy" : {
-        "name" : "nodeSet",
-        "count" : "[parameters('numberOfNodes')]"
-      },
-      "dependsOn" : [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
-      ],
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriNode')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "[concat('node', padLeft(add(copyindex(), 1), 2, '0'))]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('nodeSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('nodeVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('WorkerIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "infraLoadBalancerName" : {
-            "value" : "[variables('infraLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "['nodeavailabilityset']"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          }
-        }
-      }
-    },
-    {
-      "name" : "master1",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "dependsOn" : [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
-      ],
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "master1"
-          },
-          "dnsName" : {
-            "value" : "[concat(resourceGroup().name,'m1')]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('MasterIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "['masteravailabilityset']"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          },
-          "ipAddress" : {
-            "value" : "10.0.0.5"
-          }
-        }
-      }
-    },
-    {
-      "name" : "master2",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "dependsOn" : [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
-      ],
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "master2"
-          },
-          "dnsName" : {
-            "value" : "[concat(resourceGroup().name,'m2')]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('MasterIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "['masteravailabilityset']"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          },
-          "ipAddress" : {
-            "value" : "10.0.0.6"
-          }
-        }
-      }
-    },
-    {
-      "name" : "master3",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "dependsOn" : [
-        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
-      ],
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "master3"
-          },
-          "dnsName" : {
-            "value" : "[concat(resourceGroup().name,'m3')]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('MasterIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "['masteravailabilityset']"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          },
-          "ipAddress" : {
-            "value" : "10.0.0.7"
-          }
-        }
       }
     },
     {
@@ -1030,6 +764,256 @@
             }
           }
         ]
+      }
+    },
+    {
+      "type" : "Microsoft.Storage/storageAccounts",
+      "name" : "[variables('nodeStorageName')]",
+      "apiVersion" : "[variables('apiVersion')]",
+      "location" : "[variables('location')]",
+      "properties" : {
+        "accountType" : "[variables('vmSizesMap')[parameters('nodeVmSize')].storageAccountType]"
+      }
+    },
+    {
+      "name" : "bootstrap",
+      "type" : "Microsoft.Resources/deployments",
+      "apiVersion" : "2015-01-01",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
+      ],
+      "properties" : {
+        "mode" : "Incremental",
+        "templateLink" : {
+          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
+          "contentVersion" : "1.0.0.0"
+        },
+        "parameters" : {
+          "vmName" : {
+            "value" : "bootstrap-0"
+          },
+          "sa" : {
+            "value" : "[variables('nodeStorageName')]"
+          },
+          "subnetRef" : {
+            "value" : "[variables('masterSubnetRef')]"
+          },
+          "vmSize" : {
+            "value" : "[parameters('masterVMSize')]"
+          },
+          "ignition" : {
+            "value" : "[parameters('BootstrapIgnition')]"
+          },
+          "imageReference" : {
+            "value" : "[parameters('image')]"
+          },
+          "masterLoadBalancerName" : {
+            "value" : "[variables('masterLoadBalancerName')]"
+          },
+          "availabilitySet" : {
+            "value" : "masteravailabilityset"
+          },
+          "sshKeyData" : {
+            "value" : "[parameters('sshKeyData')]"
+          },
+          "ipAddress" : {
+            "value" : "10.0.0.4"
+          }
+        }
+      }
+    },
+    {
+      "name" : "[concat('node', copyindex())]",
+      "type" : "Microsoft.Resources/deployments",
+      "apiVersion" : "2015-01-01",
+      "copy" : {
+        "name" : "nodeSet",
+        "count" : "[parameters('numberOfNodes')]"
+      },
+      "dependsOn" : [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
+      ],
+      "properties" : {
+        "mode" : "Incremental",
+        "templateLink" : {
+          "uri" : "[variables('baseVMachineTemplateUriNode')]",
+          "contentVersion" : "1.0.0.0"
+        },
+        "parameters" : {
+          "vmName" : {
+            "value" : "[concat('node', padLeft(add(copyindex(), 1), 2, '0'))]"
+          },
+          "sa" : {
+            "value" : "[variables('nodeStorageName')]"
+          },
+          "subnetRef" : {
+            "value" : "[variables('nodeSubnetRef')]"
+          },
+          "vmSize" : {
+            "value" : "[parameters('nodeVMSize')]"
+          },
+          "ignition" : {
+            "value" : "[parameters('WorkerIgnition')]"
+          },
+          "imageReference" : {
+            "value" : "[parameters('image')]"
+          },
+          "infraLoadBalancerName" : {
+            "value" : "[variables('infraLoadBalancerName')]"
+          },
+          "availabilitySet" : {
+            "value" : "nodeavailabilityset"
+          },
+          "sshKeyData" : {
+            "value" : "[parameters('sshKeyData')]"
+          }
+        }
+      }
+    },
+    {
+      "name" : "master1",
+      "type" : "Microsoft.Resources/deployments",
+      "apiVersion" : "2015-01-01",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
+      ],
+      "properties" : {
+        "mode" : "Incremental",
+        "templateLink" : {
+          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
+          "contentVersion" : "1.0.0.0"
+        },
+        "parameters" : {
+          "vmName" : {
+            "value" : "master1"
+          },
+          "sa" : {
+            "value" : "[variables('nodeStorageName')]"
+          },
+          "subnetRef" : {
+            "value" : "[variables('masterSubnetRef')]"
+          },
+          "vmSize" : {
+            "value" : "[parameters('masterVMSize')]"
+          },
+          "ignition" : {
+            "value" : "[parameters('MasterIgnition')]"
+          },
+          "imageReference" : {
+            "value" : "[parameters('image')]"
+          },
+          "masterLoadBalancerName" : {
+            "value" : "[variables('masterLoadBalancerName')]"
+          },
+          "availabilitySet" : {
+            "value" : "masteravailabilityset"
+          },
+          "sshKeyData" : {
+            "value" : "[parameters('sshKeyData')]"
+          },
+          "ipAddress" : {
+            "value" : "10.0.0.5"
+          }
+        }
+      }
+    },
+    {
+      "name" : "master2",
+      "type" : "Microsoft.Resources/deployments",
+      "apiVersion" : "2015-01-01",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
+      ],
+      "properties" : {
+        "mode" : "Incremental",
+        "templateLink" : {
+          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
+          "contentVersion" : "1.0.0.0"
+        },
+        "parameters" : {
+          "vmName" : {
+            "value" : "master2"
+          },
+          "sa" : {
+            "value" : "[variables('nodeStorageName')]"
+          },
+          "subnetRef" : {
+            "value" : "[variables('masterSubnetRef')]"
+          },
+          "vmSize" : {
+            "value" : "[parameters('masterVMSize')]"
+          },
+          "ignition" : {
+            "value" : "[parameters('MasterIgnition')]"
+          },
+          "imageReference" : {
+            "value" : "[parameters('image')]"
+          },
+          "masterLoadBalancerName" : {
+            "value" : "[variables('masterLoadBalancerName')]"
+          },
+          "availabilitySet" : {
+            "value" : "masteravailabilityset"
+          },
+          "sshKeyData" : {
+            "value" : "[parameters('sshKeyData')]"
+          },
+          "ipAddress" : {
+            "value" : "10.0.0.6"
+          }
+        }
+      }
+    },
+    {
+      "name" : "master3",
+      "type" : "Microsoft.Resources/deployments",
+      "apiVersion" : "2015-01-01",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('nodeStorageName'))]"
+      ],
+      "properties" : {
+        "mode" : "Incremental",
+        "templateLink" : {
+          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
+          "contentVersion" : "1.0.0.0"
+        },
+        "parameters" : {
+          "vmName" : {
+            "value" : "master3"
+          },
+          "sa" : {
+            "value" : "[variables('nodeStorageName')]"
+          },
+          "subnetRef" : {
+            "value" : "[variables('masterSubnetRef')]"
+          },
+          "vmSize" : {
+            "value" : "[parameters('masterVMSize')]"
+          },
+          "ignition" : {
+            "value" : "[parameters('MasterIgnition')]"
+          },
+          "imageReference" : {
+            "value" : "[parameters('image')]"
+          },
+          "masterLoadBalancerName" : {
+            "value" : "[variables('masterLoadBalancerName')]"
+          },
+          "availabilitySet" : {
+            "value" : "masteravailabilityset"
+          },
+          "sshKeyData" : {
+            "value" : "[parameters('sshKeyData')]"
+          },
+          "ipAddress" : {
+            "value" : "10.0.0.7"
+          }
+        }
       }
     }
   ],

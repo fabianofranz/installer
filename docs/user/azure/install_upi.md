@@ -14,20 +14,13 @@ example.
   * [az (Azure CLI)][azurecli] installed and aunthenticated
   * python3
   * [jq][jqjson]
+  * [yq][yqyaml]
 * python dotmap library: install it with `pip install dotmap`
 
 ## Setup
 
-The environment variables variables below set up a few configurations that will be used by the examples from now on.
-Adjust their values to reflect your own needs.
-
-```sh
-export RESOURCE_GROUP_NAME="uniqueresourcegroup"
-export AZREGION="centralus"
-export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/"
-export VHD_NAME="rhcos-42.80.20191002.0.vhd"
-export STORAGE_ACCOUNT_NAME="sauniqueresourcegroup"
-```
+The machines will be started manually. Therefore, it is required to generate
+the bootstrap and machine ignition configs and store them for later steps.
 
 ### Create Configuration
 
@@ -46,6 +39,22 @@ INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Base Domain example.com
 ? Cluster Name test
 ? Pull Secret [? for help]
+```
+
+#### Extract Resource Group from Config
+
+All resources created as part of this Azure deployment will exist as part of a
+resource group. Export the resource group name from the generated configuration,
+along with other environment variables that will be used in this example, with
+the commands below.
+
+```sh
+export RESOURCE_GROUP_NAME=`yq -r .metadata.name install-config.yaml`
+export AZURE_REGION=`yq -r .platform.azure.region install-config.yaml`
+export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/"
+export VHD_NAME="rhcos-42.80.20191002.0.vhd"
+export SSH_KEY=`yq -r .sshKey install-config.yaml`
+export BASE_DOMAIN=`yq -r .baseDomain install-config.yaml`
 ```
 
 #### Create manifests
@@ -119,7 +128,7 @@ below to create it for the unique name set in the RESOURCE_GROUP_NAME and the re
 variable.
 
 ```sh
-az group create --name $RESOURCE_GROUP_NAME --location $AZREGION
+az group create --name $RESOURCE_GROUP_NAME --location $AZURE_REGION
 az identity create -g $RESOURCE_GROUP_NAME -n ${RESOURCE_GROUP_NAME}_userid
 ```
 
@@ -128,8 +137,8 @@ az identity create -g $RESOURCE_GROUP_NAME -n ${RESOURCE_GROUP_NAME}_userid
 Create a storage account and export its key as an environment variable.
 
 ```sh
-az storage account create --location $AZREGION --name $STORAGE_ACCOUNT_NAME --kind Storage --resource-group $RESOURCE_GROUP_NAME --sku Standard_LRS
-export ACCOUNT_KEY=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $RESOURCE_GROUP_NAME --query "[0].value" -o tsv)
+az storage account create --location $AZURE_REGION --name sa${RESOURCE_GROUP_NAME} --kind Storage --resource-group $RESOURCE_GROUP_NAME --sku Standard_LRS
+export ACCOUNT_KEY=`az storage account keys list --account-name sa${RESOURCE_GROUP_NAME} --resource-group $RESOURCE_GROUP_NAME --query "[0].value" -o tsv`
 ```
 
 ### Copy the RHCOS Virtual Hard Disk (VHD)
@@ -138,8 +147,8 @@ Given the size of the Red Hat Enterprise Linux CoreOS virtual hard disk, it's no
 with the VHD stored locally. We must copy and store it in the resource group instead. To do so:
 
 ```sh
-az storage container create --name vhd --account-name $STORAGE_ACCOUNT_NAME
-az storage blob copy start --account-name $STORAGE_ACCOUNT_NAME --account-key "$ACCOUNT_KEY" --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "${VHD_URL}${VHD_NAME}"
+az storage container create --name vhd --account-name sa${RESOURCE_GROUP_NAME}
+az storage blob copy start --account-name sa${RESOURCE_GROUP_NAME} --account-key "$ACCOUNT_KEY" --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "${VHD_URL}${VHD_NAME}"
 ```
 
 To track the progress, you can use:
@@ -148,7 +157,7 @@ To track the progress, you can use:
 status="unknown"
 while [ "$status" != "success" ]
 do
-    status=$(az storage blob show --container-name vhd --name "rhcos.vhd" --account-name $STORAGE_ACCOUNT_NAME --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status)
+    status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name sa${RESOURCE_GROUP_NAME} --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
 done
 ```
 
@@ -159,10 +168,10 @@ for deploying most resources. The template exposes some of its configurations as
 `azuredeploy.parameters.json`. Use the following commands to configure the parameters based on the generated ignition files.
 
 ```sh
-az storage container create --name files --account-name $STORAGE_ACCOUNT_NAME --public-access blob
-az storage blob upload --account-name $STORAGE_ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
-BOOTSTRAPURL=$(az storage blob url --account-name $STORAGE_ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
-python3 setup-variables.py $BOOTSTRAPURL $STORAGE_ACCOUNT_NAME
+az storage container create --name files --account-name sa${RESOURCE_GROUP_NAME} --public-access blob
+az storage blob upload --account-name sa${RESOURCE_GROUP_NAME} --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
+export BOOTSTRAPURL=`az storage blob url --account-name sa${RESOURCE_GROUP_NAME} --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
+python3 setup-variables.py $BOOTSTRAPURL sa${RESOURCE_GROUP_NAME} "${SSH_KEY}"
 ```
 
 ### Create public IP addresses
@@ -170,6 +179,42 @@ python3 setup-variables.py $BOOTSTRAPURL $STORAGE_ACCOUNT_NAME
 ```sh
 az network public-ip create -g $RESOURCE_GROUP_NAME -n $RESOURCE_GROUP_NAME --allocation-method static
 az network public-ip create -g $RESOURCE_GROUP_NAME -n ${RESOURCE_GROUP_NAME}app --allocation-method static
+
+export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP_NAME --query "[?name=='${RESOURCE_GROUP_NAME}'] | [0].ipAddress" -o tsv`
+export PUBLIC_IP_APPS=`az network public-ip list -g $RESOURCE_GROUP_NAME --query "[?name=='${RESOURCE_GROUP_NAME}app'] | [0].ipAddress" -o tsv`
+```
+
+### DNS
+
+```sh
+az network private-dns zone create -g $RESOURCE_GROUP_NAME -n ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t bootstrap-0.${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n bootstrap-0 -a 10.0.0.4
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n control-plane-0 -a 10.0.0.5
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n control-plane-1 -a 10.0.0.6
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n control-plane-2 -a 10.0.0.7
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n etcd-0 -a 10.0.0.5
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n etcd-1 -a 10.0.0.6
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n etcd-2 -a 10.0.0.7
+
+az network private-dns record-set a create -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api --ttl 60
+az network private-dns record-set a create -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api-int --ttl 60
+az network private-dns record-set a create -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api-int -a $PUBLIC_IP
+az network private-dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_APPS
+
+az network dns zone create -g $RESOURCE_GROUP_NAME -n ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN}
+
+az network dns record-set a create -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api --ttl 60
+az network dns record-set a create -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP
+az network dns record-set a add-record -g $RESOURCE_GROUP_NAME -z ${RESOURCE_GROUP_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_APPS
 ```
 
 ## Deployment
@@ -203,7 +248,7 @@ Once the installation is complete you can deallocate and delete bootstrap resour
 ```sh
 az vm stop --resource-group $RESOURCE_GROUP_NAME --name bootstrap-0
 az vm deallocate --resource-group $RESOURCE_GROUP_NAME --name bootstrap-0 --no-wait
-az storage blob delete --account-key $ACCOUNT_KEY --account-name $STORAGE_ACCOUNT_NAME --container-name files --name bootstrap.ign
+az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${RESOURCE_GROUP_NAME} --container-name files --name bootstrap.ign
 ```
 
 ## Customization
@@ -218,10 +263,11 @@ By default this creates:
 * 2 Availablity Groups
 
 These can be changed by editing `azuredeploy.json`, `azuredeploy.parameters.json`, `master.json`, or `node.json`. The
-OpenShift version to be deployed can be changed by pointing the VHD_NAME environment variable to a different RHCOS VHD 
+OpenShift version to be deployed can be changed by pointing the VHD_NAME environment variable to a different RHCOS VHD
 image. Note that 4.3 is the minimum version supported for Azure UPI.
 
 [azuretemplates]: https://docs.microsoft.com/en-us/azure/azure-resource-manager/template-deployment-overview
 [openshiftinstall]: https://github.com/openshift/installer
 [azurecli]: https://docs.microsoft.com/en-us/cli/azure/
 [jqjson]: https://stedolan.github.io/jq/
+[yqyaml]: https://yq.readthedocs.io/en/latest/

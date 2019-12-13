@@ -6,6 +6,7 @@ from dotmap import DotMap
 
 url = sys.argv[1]
 storageAccountName = sys.argv[2]
+sshkey = sys.argv[3]
 
 ign = DotMap()
 config = DotMap()
@@ -14,10 +15,6 @@ config.replace.source = url
 ign.ignition.config = config
 
 ignstr = json.dumps(dict(**ign.toDict()))
-
-sshpath = os.path.expanduser('~/.ssh/ffranz_rsa.pub')
-with open(sshpath, "r") as sshFile:
-    sshkey = sshFile.read()
 
 with open("master.ign", "r") as ignFile:
     master_ignition = json.load(ignFile)
@@ -30,7 +27,6 @@ data.parameters.BootstrapIgnition.value = base64.b64encode(ignstr.encode()).deco
 data.parameters.MasterIgnition.value = base64.b64encode(json.dumps(master_ignition).encode()).decode()
 data.parameters.WorkerIgnition.value = base64.b64encode(json.dumps(worker_ignition).encode()).decode()
 data.parameters.sshKeyData.value = sshkey.rstrip()
-data.parameters.storageAccountName.value = storageAccountName
 data.parameters.image.value = 'https://' + storageAccountName + '.blob.core.windows.net/vhd/rhcos.vhd'
 
 jsondata = dict(**data.toDict())
