@@ -298,7 +298,7 @@
             "value" : "[parameters('sshKeyData')]"
           },
           "ipAddress" : {
-            "value" : "[concat('10.0.0.', add(copyindex(), 4))]"
+            "value" : "[concat('10.0.0.', add(copyindex(), 5))]"
           }
         }
       }

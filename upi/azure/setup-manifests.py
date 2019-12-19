@@ -48,15 +48,20 @@ with open('manifests/cluster-infrastructure-02-config.yml') as file:
     file.close()
     yamlx['status']['platformStatus']['azure']['resourceGroupName'] = resource_group
     yamlx['status']['infrastructureName'] = resource_group
+    yamlx['metadata']['creationTimestamp'] = None
     with open('manifests/cluster-infrastructure-02-config.yml', 'w') as outfile:
         yaml.dump(yamlx, outfile, default_flow_style=False)
         outfile.close()
 
-dnsyml = "manifests/cluster-dns-02-config.yml"
-data = yaml.load(open(dnsyml), Loader=yaml.BaseLoader)
-del data["spec"]["publicZone"]
-del data["spec"]["privateZone"]
-open(dnsyml, "w").write(yaml.dump(data, default_flow_style=False))
+with open('manifests/cluster-dns-02-config.yml') as file:
+    yamlx = yaml.load(file, Loader=yaml.BaseLoader)
+    file.close()
+    yamlx['metadata']['creationTimestamp'] = None
+    del yamlx["spec"]["publicZone"]
+    del yamlx["spec"]["privateZone"]
+    with open('manifests/cluster-dns-02-config.yml', 'w') as outfile:
+        yaml.dump(yamlx, outfile, default_flow_style=False)
+        outfile.close()
 
 with open('ingress-controller.yaml') as infile:
     with open('manifests/ingress-controller-02-default.yaml', 'w') as file:
