@@ -119,61 +119,160 @@
     }
   },
   "variables" : {
-    "gituser" : "fabianofranz",
-    "branch" : "cors-1249-azure-upi",
-    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
-    "baseVMachineTemplateUriMaster" : "[concat(variables('baseTemplateUrl'), 'master.json')]",
     "virtualNetworkName" : "openshiftVnet",
     "mastersubnetName" : "masterSubnet",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
     "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('mastersubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]"
+    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+    "apiVersion" : "2018-06-01",
+    "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+    "useridname" : "[concat(resourceGroup().name,'_userid')]",
+    "vmName": "bootstrap-0"
   },
   "resources" : [
     {
-      "name" : "bootstrap",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
+      "apiVersion" : "[variables('apiVersion')]",
+      "type" : "Microsoft.Network/networkInterfaces",
+      "name" : "[concat(variables('vmName'), 'nic')]",
+      "location" : "[resourceGroup().location]",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/networkSecurityGroups/', concat(variables('vmName'), 'nsg'))]"
+      ],
       "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "bootstrap-0"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('BootstrapIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "masteravailabilityset"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          },
-          "ipAddress" : {
-            "value" : "10.0.0.4"
+        "ipConfigurations" : [
+          {
+            "name" : "ipconfig1",
+            "properties" : {
+              "privateIPAllocationMethod" : "Dynamic",
+              "subnet" : {
+                "id" : "[variables('masterSubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools" : [
+                {
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
+                },
+                {
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name,'intlb', '/backendAddressPools/masters')]"
+                }
+              ]
+            }
           }
+        ],
+        "networkSecurityGroup" : {
+          "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmName'), 'nsg'))]"
         }
       }
+    },
+    {
+      "apiVersion" : "[variables('apiVersion')]",
+      "type" : "Microsoft.Compute/virtualMachines",
+      "name" : "[variables('vmName')]",
+      "location" : "[resourceGroup().location]",
+      "identity" : {
+        "type" : "userAssigned",
+        "userAssignedIdentities" : {
+          "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/',variables('useridname'))]" : {}
+        }
+      },
+      "dependsOn" : [
+        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]"
+      ],
+      "properties" : {
+        "hardwareProfile" : {
+          "vmSize" : "[parameters('masterVMSize')]"
+        },
+        "osProfile" : {
+          "computerName" : "[variables('vmName')]",
+          "adminUsername" : "core",
+          "customData" : "[parameters('BootstrapIgnition')]",
+          "linuxConfiguration" : {
+            "disablePasswordAuthentication" : "true",
+            "ssh" : {
+              "publicKeys" : [
+                {
+                  "path" : "[variables('sshKeyPath')]",
+                  "keyData" : "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile" : {
+          "osDisk" : {
+            "name" : "osdisk",
+            "osType" : "Linux",
+            "image" : {
+              "uri" : "[parameters('image')]"
+            },
+            "vhd" : {
+              "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '.vhd')]"
+            },
+            "caching" : "ReadWrite",
+            "createOption" : "FromImage",
+            "diskSizeGB" : "128"
+          },
+          "dataDisks" : [
+            {
+              "caching" : "None",
+              "createOption" : "Empty",
+              "diskSizeGB" : "128",
+              "lun" : 0,
+              "name" : "datadisk1",
+              "vhd" : {
+                "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '_datadisk1.vhd')]"
+              }
+            },
+            {
+              "caching" : "None",
+              "createOption" : "Empty",
+              "diskSizeGB" : "128",
+              "lun" : 1,
+              "name" : "datadisk2",
+              "vhd" : {
+                "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '_datadisk2.vhd')]"
+              }
+            }
+          ]
+        },
+        "networkProfile" : {
+          "networkInterfaces" : [
+            {
+              "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmName'), 'nic'))]"
+            }
+          ]
+        },
+        "availabilitySet" : {
+          "id" : "[resourceId('Microsoft.Compute/availabilitySets', 'masteravailabilityset')]"
+        }
+      }
+    },
+    {
+      "type" : "Microsoft.Network/networkSecurityGroups",
+      "name" : "[concat(variables('vmName'), 'nsg')]",
+      "tags" : {
+        "displayName" : "NetworkSecurityGroup"
+      },
+      "apiVersion" : "[variables('apiVersion')]",
+      "location" : "[resourceGroup().location]",
+      "properties" : {
+        "securityRules" : [
+          {
+            "name" : "default-allow-openshift-master",
+            "properties" : {
+              "protocol" : "Tcp",
+              "sourcePortRange" : "*",
+              "destinationPortRange" : "6443",
+              "sourceAddressPrefix" : "*",
+              "destinationAddressPrefix" : "*",
+              "access" : "Allow",
+              "priority" : 2000,
+              "direction" : "Inbound"
+            }
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "outputs" : {}
 }

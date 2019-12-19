@@ -37,9 +37,6 @@
       "metadata" : {
         "description" : "sshKeyData"
       }
-    },
-    "ipAddress" : {
-      "type" : "string"
     }
   },
   "variables" : {
@@ -61,8 +58,7 @@
           {
             "name" : "ipconfig1",
             "properties" : {
-              "privateIPAllocationMethod" : "Static",
-              "privateIPAddress" : "[parameters('ipAddress')]",
+              "privateIPAllocationMethod" : "Dynamic",
               "subnet" : {
                 "id" : "[parameters('subnetRef')]"
               },

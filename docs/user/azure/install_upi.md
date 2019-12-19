@@ -193,7 +193,17 @@ python3 setup-variables.py $BOOTSTRAPURL sa${CLUSTER_NAME} "${SSH_KEY}"
 az group deployment create -g $RESOURCE_GROUP --name 01_${CLUSTER_NAME} --template-file "01_vpc.json"
 ```
 
-### Create IPs, load balancers and DNS records
+### Deploy the storage account
+
+```sh
+az group deployment create -g $RESOURCE_GROUP --name 02_${CLUSTER_NAME} --template-file "02_storage.json"
+```
+
+### Deploy the load balancers
+
+```sh
+az group deployment create -g $RESOURCE_GROUP --name 03_${CLUSTER_NAME} --template-file "03_infra.json"
+```
 
 Create the public IP addresses:
 
@@ -202,33 +212,7 @@ az network public-ip create -g $RESOURCE_GROUP -n $CLUSTER_NAME --allocation-met
 az network public-ip create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}app --allocation-method static
 ```
 
-Create the internal DNS entries:
-
-```sh
-az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
-
-az network private-dns record-set srv create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp --ttl 60
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
-
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 --ttl 60
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 --ttl 60
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 --ttl 60
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 --ttl 60
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 -a 10.0.0.4
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 -a 10.0.0.5
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a 10.0.0.6
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a 10.0.0.7
-
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
-az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int --ttl 60
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a 10.0.0.63
-az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int -a 10.0.0.63
-```
-
-Create the external DNS entries:
+Create DNS records for the public load balancer:
 
 ```sh
 export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}'] | [0].ipAddress" -o tsv`
@@ -243,16 +227,17 @@ az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${B
 az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_APPS
 ```
 
-Deploy the load balancers:
+Create private DNS records for the internal load balancer:
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 02_${CLUSTER_NAME} --template-file "02_infra.json"
-```
+export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}intlb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
 
-### Deploy the storage accounts
+az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 
-```sh
-az group deployment create -g $RESOURCE_GROUP --name 03_${CLUSTER_NAME} --template-file "03_storage.json"
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int --ttl 60
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a $INTERNAL_LB_IP
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int -a $INTERNAL_LB_IP
 ```
 
 ### Launch the temporary cluster bootstrap
@@ -261,10 +246,40 @@ az group deployment create -g $RESOURCE_GROUP --name 03_${CLUSTER_NAME} --templa
 az group deployment create -g $RESOURCE_GROUP --name 04_${CLUSTER_NAME} --template-file "04_bootstrap.json" --parameters "runit.parameters.json"
 ```
 
+Create private DNS records for the bootstrap:
+
+```sh
+export BOOTSTRAP_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name bootstrap-0nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 --ttl 60
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 -a $BOOTSTRAP_IP
+```
+
 ### Deploy the masters and workers
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_machines.json" --parameters "runit.parameters.json"
+```
+
+Create private DNS records for the control plane:
+
+```sh
+export MASTER0_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master01nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export MASTER1_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master02nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export MASTER2_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master03nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+
+az network private-dns record-set srv create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp --ttl 60
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
+
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 --ttl 60
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 --ttl 60
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 --ttl 60
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 -a $MASTER0_IP
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a $MASTER1_IP
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a $MASTER2_IP
 ```
 
 ### Wait for the bootstrap and installation complete
