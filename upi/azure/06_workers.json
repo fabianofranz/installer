@@ -107,7 +107,7 @@
   },
   "variables" : {
     "gituser" : "fabianofranz",
-    "branch" : "cors-1249-azure-upi",
+    "branch" : "cors-1249-azure-upi-bk",
     "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
     "baseVMachineTemplateUriNode" : "[concat(variables('baseTemplateUrl'), 'node.json')]",
     "virtualNetworkName" : "openshiftVnet",
