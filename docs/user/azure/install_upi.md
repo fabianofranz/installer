@@ -41,6 +41,19 @@ INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Pull Secret [? for help]
 ```
 
+#### Empty the compute pool
+
+We'll be providing the control-plane and compute machines ourselves, so edit the resulting `install-config.yaml` to set `replicas` to 0 for the `compute` pool:
+
+```sh
+python -c '
+import yaml;
+path = "install-config.yaml";
+data = yaml.full_load(open(path));
+data["compute"][0]["replicas"] = 0;
+open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+```
+
 #### Extract data from install config
 
 Some data from the install configuration will be used on later steps. Export them as environment variables with:
@@ -79,8 +92,8 @@ INFO Consuming "Install Config" from target directory
 #### Update manifests
 
 The manifests need to reflect the resources to be created by the [Azure Resource Manager][azuretemplates] template, e.g. the
-VNet and subnet names, and so on. Also, we you don't want [the ingress operator][ingress-operator] to create DNS records so we need
-to remove the `privateZone` and `publicZone` sections from the DNS configuration in manifests.
+VNet and subnet names, resource group name, and so on. Also, we you don't want [the ingress operator][ingress-operator] to
+create DNS records so we need to remove the `privateZone` and `publicZone` sections from the DNS configuration in manifests.
 
 A Python script is provided to help with these changes in manifests. Run it with:
 
@@ -279,7 +292,7 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 ### Deploy the masters and workers
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_machines.json" --parameters "runit.parameters.json"
+az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_masters.json" --parameters "runit.parameters.json"
 ```
 
 Create private DNS records for the control plane:

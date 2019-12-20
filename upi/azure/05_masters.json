@@ -254,51 +254,6 @@
           }
         }
       }
-    },
-    {
-      "name" : "[concat('node', copyindex())]",
-      "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
-      "copy" : {
-        "name" : "nodeSet",
-        "count" : "[parameters('numberOfNodes')]"
-      },
-      "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriNode')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "[concat('node', padLeft(add(copyindex(), 1), 2, '0'))]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('nodeSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('nodeVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('WorkerIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
-          },
-          "infraLoadBalancerName" : {
-            "value" : "[variables('infraLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "nodeavailabilityset"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          }
-        }
-      }
     }
   ],
   "outputs" : {
