@@ -21,13 +21,14 @@
     "infraLbBackendPoolId" : "[concat(variables('infraLbId'),'/backendAddressPools/AppLoadBalancerBackend')]",
     "infraLbHttpProbeId" : "[concat(variables('infraLbId'),'/probes/httpProbe')]",
     "infraLbHttpsProbeId" : "[concat(variables('infraLbId'),'/probes/httpsProbe')]",
-    "apiVersionNetwork" : "2016-03-30",
+    "apiVersionNetwork" : "2018-12-01",
     "intLoadBalancerName" : "[concat(resourceGroup().name, 'intlb')]",
     "intLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName'))]",
     "intLbBackendPoolId" : "[concat(variables('intLbId'),'/backendAddressPools/masters')]",
     "intLbProbeId" : "[concat(variables('intLbId'),'/probes/lbprobe')]",
     "intLbProbeId2" : "[concat(variables('intLbId'),'/probes/probe22623')]",
-    "intLbFrontEndConfigId" : "[concat(variables('intLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]"
+    "intLbFrontEndConfigId" : "[concat(variables('intLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
+    "skuName": "Standard"
   },
   "resources" : [
     {
@@ -37,6 +38,9 @@
       "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftInfraLBPublicIP"
+      },
+      "sku": {
+        "name": "[variables('skuName')]"
       },
       "properties" : {
         "publicIPAllocationMethod" : "Static",
@@ -53,6 +57,9 @@
       "tags" : {
         "displayName" : "OpenShiftMasterPublicIP"
       },
+      "sku": {
+        "name": "[variables('skuName')]"
+      },
       "properties" : {
         "publicIPAllocationMethod" : "Static",
         "dnsSettings" : {
@@ -67,6 +74,9 @@
       "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftMasterLB"
+      },
+      "sku": {
+        "name": "[variables('skuName')]"
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/publicIPAddresses/', resourceGroup().name)]"
@@ -128,6 +138,9 @@
       "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "appLB"
+      },
+      "sku": {
+        "name": "[variables('skuName')]"
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/publicIPAddresses/', variables('infraPublicIpName'))]"
@@ -213,6 +226,9 @@
       "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftIntLB"
+      },
+      "sku": {
+        "name": "[variables('skuName')]"
       },
       "properties" : {
         "frontendIPConfigurations" : [

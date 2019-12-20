@@ -15,27 +15,6 @@
         "description" : "User name for the Virtual Machine and OpenShift Webconsole."
       }
     },
-    "MasterIgnition" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "User password for the OpenShift Webconsole"
-      }
-    },
-    "WorkerIgnition" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "User password for the OpenShift Webconsole"
-      }
-    },
-    "numberOfNodes" : {
-      "type" : "int",
-      "defaultValue" : 3,
-      "minValue" : 2,
-      "maxValue" : 30,
-      "metadata" : {
-        "description" : "Number of OpenShift Nodes to deploy (max 30)"
-      }
-    },
     "sshKeyData" : {
       "type" : "securestring",
       "metadata" : {

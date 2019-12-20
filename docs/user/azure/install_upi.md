@@ -145,18 +145,27 @@ After running the command, several files will be available in the directory.
 
 ```console
 $ tree
+.
+├── 01_vpc.json
+├── 02_infra.json
+├── 02_storage.json
+├── 03_infra.json
+├── 04_bootstrap.json
+├── 04_bootstrap.template.json
+├── 05_masters.json
+├── 05_masters.template.json
+├── 06_workers.json
+├── 06_workers.template.json
 ├── auth
 │   ├── kubeadmin-password
 │   └── kubeconfig
-├── azuredeploy.json
-├── azuredeploy.parameters.json
 ├── bootstrap.ign
 ├── master.ign
 ├── master.json
 ├── metadata.json
 ├── node.json
 ├── setup-manifests.py
-├── setup-variables.py
+├── setup-parameters.py
 └── worker.ign
 ```
 
@@ -209,11 +218,11 @@ export BOOTSTRAPURL=`az storage blob url --account-name sa${CLUSTER_NAME} --acco
 ### Create a template parameters file
 
 The key part of this UPI deployment are the [Azure Resource Manager][azuretemplates] templates, which are responsible
-for deploying most resources. The template exposes some of its configurations as deployment parameters in a separate template.
-Run the Python script below to generate the `runit.parameters.json` file based on the generated ignition files.
+for deploying most resources. The templated exposes some of its configurations as deployment parameters in separate templates.
+Run the Python script below to generate the `*.parameters.json` files based on the generated ignition files.
 
 ```sh
-python3 setup-variables.py $BOOTSTRAPURL sa${CLUSTER_NAME} "${SSH_KEY}"
+python3 setup-parameters.py $BOOTSTRAPURL sa${CLUSTER_NAME} "${SSH_KEY}"
 ```
 
 ## Deployment
@@ -274,7 +283,7 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 ### Launch the temporary cluster bootstrap
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 04_${CLUSTER_NAME} --template-file "04_bootstrap.json" --parameters "runit.parameters.json"
+az group deployment create -g $RESOURCE_GROUP --name 04_${CLUSTER_NAME} --template-file "04_bootstrap.json" --parameters "04_bootstrap.parameters.json"
 ```
 
 Create private DNS records for the bootstrap:
@@ -289,10 +298,10 @@ az network private-dns record-set srv create -g $RESOURCE_GROUP -z ${CLUSTER_NAM
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
-### Deploy the masters and workers
+### Deploy the masters
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_masters.json" --parameters "runit.parameters.json"
+az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_masters.json" --parameters "05_masters.parameters.json"
 ```
 
 Create private DNS records for the control plane:
@@ -312,6 +321,12 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
+```
+
+### Deploy the workers
+
+```sh
+az group deployment create -g $RESOURCE_GROUP --name 06_${CLUSTER_NAME} --template-file "06_workers.json" --parameters "06_workers.parameters.json"
 ```
 
 ### Wait for the bootstrap and installation complete

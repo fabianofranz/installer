@@ -5,12 +5,6 @@
     "image" : {
       "value" : ""
     },
-    "BootstrapIgnition" : {
-      "value" : ""
-    },
-    "MasterIgnition" : {
-      "value" : ""
-    },
     "WorkerIgnition" : {
       "value" : ""
     },
