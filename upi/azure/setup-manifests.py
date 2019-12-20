@@ -62,10 +62,3 @@ with open('manifests/cluster-dns-02-config.yml') as file:
     with open('manifests/cluster-dns-02-config.yml', 'w') as outfile:
         yaml.dump(yamlx, outfile, default_flow_style=False)
         outfile.close()
-
-with open('ingress-controller.yaml') as infile:
-    with open('manifests/ingress-controller-02-default.yaml', 'w') as file:
-        for line in infile:
-            file.write(line)
-        file.close()
-    infile.close()
