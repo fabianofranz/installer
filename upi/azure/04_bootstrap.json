@@ -112,6 +112,51 @@
   "resources" : [
     {
       "apiVersion" : "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/images",
+      "name": "[concat(variables('vmName'), '-image')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "storageProfile": {
+          "osDisk": {
+            "osType": "Linux",
+            "blobUri": "[parameters('image')]",
+            "storageAccountType": "Standard_LRS"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion" : "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/disks",
+      "name": "[concat(variables('vmName'),'_DataDisk1')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "creationData": {
+          "createOption": "Empty"
+        },
+        "diskSizeGB": 128
+      }
+    },
+    {
+      "apiVersion" : "[variables('apiVersion')]",
+      "type": "Microsoft.Compute/disks",
+      "name": "[concat(variables('vmName'),'_DataDisk2')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "creationData": {
+          "createOption": "Empty"
+        },
+        "diskSizeGB": 128
+      }
+    },
+    {
+      "apiVersion" : "[variables('apiVersion')]",
       "type" : "Microsoft.Network/networkInterfaces",
       "name" : "[concat(variables('vmName'), 'nic')]",
       "location" : "[resourceGroup().location]",
@@ -155,7 +200,10 @@
         }
       },
       "dependsOn" : [
-        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
+        "[concat('Microsoft.Compute/images/', concat(variables('vmName'), '-image'))]",
+        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
+        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
       ],
       "properties" : {
         "hardwareProfile" : {
@@ -178,38 +226,32 @@
           }
         },
         "storageProfile" : {
-          "osDisk" : {
-            "name" : "osdisk",
-            "osType" : "Linux",
-            "image" : {
-              "uri" : "[parameters('image')]"
-            },
-            "vhd" : {
-              "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '.vhd')]"
-            },
-            "caching" : "ReadWrite",
-            "createOption" : "FromImage",
-            "diskSizeGB" : "128"
+          "imageReference": {
+            "id": "[resourceId('Microsoft.Compute/images', concat(variables('vmName'), '-image'))]"
           },
-          "dataDisks" : [
+          "osDisk" : {
+            "name": "[concat(variables('vmName'),'_OSDisk')]",
+            "osType" : "Linux",
+            "createOption" : "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
+            }
+          },
+          "dataDisks": [
             {
-              "caching" : "None",
-              "createOption" : "Empty",
-              "diskSizeGB" : "128",
-              "lun" : 0,
-              "name" : "datadisk1",
-              "vhd" : {
-                "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '_datadisk1.vhd')]"
+              "lun": 0,
+              "name": "[concat(variables('vmName'),'_DataDisk1')]",
+              "createOption": "attach",
+              "managedDisk": {
+                "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk1'))]"
               }
             },
             {
-              "caching" : "None",
-              "createOption" : "Empty",
-              "diskSizeGB" : "128",
-              "lun" : 1,
-              "name" : "datadisk2",
-              "vhd" : {
-                "uri" : "[concat('http://', variables('nodeStorageName'), '.blob.core.windows.net/openshiftvmachines/', variables('vmName'), '_datadisk2.vhd')]"
+              "lun": 1,
+              "name": "[concat(variables('vmName'),'_DataDisk2')]",
+              "createOption": "attach",
+              "managedDisk": {
+                "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk2'))]"
               }
             }
           ]

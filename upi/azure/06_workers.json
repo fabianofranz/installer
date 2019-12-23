@@ -164,10 +164,5 @@
       }
     }
   ],
-  "outputs" : {
-    "Openshift Webconsole" : {
-      "type" : "string",
-      "value" : "[concat('https://', 'TODO', ':8443/console')]"
-    }
-  }
+  "outputs" : {}
 }

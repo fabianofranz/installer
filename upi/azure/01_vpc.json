@@ -8,8 +8,7 @@
     "nodesubnetName" : "nodeSubnet",
     "nodesubnetPrefix" : "10.0.1.0/24",
     "mastersubnetName" : "masterSubnet",
-    "mastersubnetPrefix" : "10.0.0.0/24",
-    "apiVersionCompute" : "2015-06-15"
+    "mastersubnetPrefix" : "10.0.0.0/24"
   },
   "resources" : [
     {
@@ -46,15 +45,25 @@
       "type" : "Microsoft.Compute/availabilitySets",
       "name" : "masteravailabilityset",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionCompute')]",
-      "properties" : {}
+      "apiVersion" : "2018-10-01",
+      "properties": {
+        "platformFaultDomainCount": 3
+      },
+      "sku": {
+        "name" : "Aligned"
+      }
     },
     {
       "type" : "Microsoft.Compute/availabilitySets",
       "name" : "nodeavailabilityset",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionCompute')]",
-      "properties" : {}
+      "apiVersion" : "2018-10-01",
+      "properties": {
+        "platformFaultDomainCount": 3
+      },
+      "sku": {
+        "name" : "Aligned"
+      }
     }
   ]
 }
