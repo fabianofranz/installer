@@ -169,6 +169,19 @@ $ tree
 └── worker.ign
 ```
 
+### Infra ID
+
+The OpenShift cluster has been assigned an identifier in the form of `<cluster name>-<random string>`. You do not need this for anything, but it is a good idea to keep it around.
+You can see the various metadata about your future cluster in `metadata.json`.
+
+The Infra ID is under the `infraID` key:
+
+```console
+$ export INFRA_ID=$(jq -r .infraID metadata.json)
+$ echo $INFRA_ID
+openshift-vw4j5
+```
+
 ### Create a Storage Account
 
 Create a storage account and export its key as an environment variable.
@@ -324,11 +337,105 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
+### Access the OpenShift API
+
+You can use the `oc` or `kubectl` commands to talk to the OpenShift API. The admin credentials are in `auth/kubeconfig`:
+
+```sh
+export KUBECONFIG="$PWD/auth/kubeconfig"
+oc get nodes
+oc get clusteroperator
+```
+
+**NOTE**: Only the API will be up at this point. The OpenShift web console will run on the compute nodes.
+
 ### Deploy the workers
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP --name 06_${CLUSTER_NAME} --template-file "06_workers.json" --parameters "06_workers.parameters.json"
 ```
+
+### Approve the worker CSRs
+
+TODO improve this section, actual console output
+
+Even after they've booted up, the workers will not show up in `oc get nodes`.
+
+Instead, they will create certificate signing requests (CSRs) which need to be approved. You can watch for the CSRs here:
+
+```sh
+$ watch oc get csr -A
+```
+
+Eventually, you should see `Pending` entries looking like this
+
+```sh
+$ oc get csr -A
+NAME        AGE    REQUESTOR                                                                   CONDITION
+csr-2scwb   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-5jwqf   16m    system:node:openshift-qlvwv-master-0                                         Approved,Issued
+csr-88jp8   116s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-9dt8f   15m    system:node:openshift-qlvwv-master-1                                         Approved,Issued
+csr-bqkw5   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-dpprd   6s     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-dtcws   24s    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-lj7f9   16m    system:node:openshift-qlvwv-master-2                                         Approved,Issued
+csr-lrtlk   15m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-wkm94   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+```
+
+You should inspect each pending CSR and verify that it comes from a node you recognise:
+
+```
+$ oc describe csr csr-88jp8
+Name:               csr-88jp8
+Labels:             <none>
+Annotations:        <none>
+CreationTimestamp:  Wed, 23 Oct 2019 13:22:51 +0200
+Requesting User:    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper
+Status:             Pending
+Subject:
+         Common Name:    system:node:openshift-qlvwv-worker-0
+         Serial Number:
+         Organization:   system:nodes
+Events:  <none>
+```
+
+If it does (this one is for `openshift-qlvwv-worker-0` which we've created earlier), you can approve it:
+
+```sh
+$ oc adm certificate approve csr-88jp8
+```
+
+Approved nodes should now show up in `oc get nodes`, but they will be in the `NotReady` state. They will create a second CSR which you should also review:
+
+```sh
+$ oc get csr -A
+NAME        AGE     REQUESTOR                                                                   CONDITION
+csr-2scwb   17m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-5jwqf   17m     system:node:openshift-qlvwv-master-0                                         Approved,Issued
+csr-7mv4d   13s     system:node:openshift-qlvwv-worker-1                                         Pending
+csr-88jp8   3m29s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-9dt8f   17m     system:node:openshift-qlvwv-master-1                                         Approved,Issued
+csr-bqkw5   18m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-bx7p4   28s     system:node:openshift-qlvwv-worker-0                                         Pending
+csr-dpprd   99s     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-dtcws   117s    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-lj7f9   17m     system:node:openshift-qlvwv-master-2                                         Approved,Issued
+csr-lrtlk   17m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-wkm94   18m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-wqpfd   21s     system:node:openshift-qlvwv-worker-2                                         Pending
+```
+
+(we see the CSR approved earlier as well as a new `Pending` one for the same node: `openshift-qlvwv-worker-0`)
+
+And approve:
+
+```sh
+$ oc adm certificate approve csr-bx7p4
+```
+
+Once this CSR is approved, the node should switch to `Ready` and pods will be scheduled on it.
 
 ### Wait for the bootstrap and installation complete
 
@@ -360,3 +467,4 @@ az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${CLUSTER_NAM
 [jqjson]: https://stedolan.github.io/jq/
 [yqyaml]: https://yq.readthedocs.io/en/latest/
 [ingress-operator]: https://github.com/openshift/cluster-ingress-operator
+[machine-api-operator]: https://github.com/openshift/machine-api-operator
