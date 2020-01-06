@@ -112,21 +112,6 @@
   "resources" : [
     {
       "apiVersion" : "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/images",
-      "name": "[concat(variables('vmName'), '-image')]",
-      "location": "[resourceGroup().location]",
-      "properties": {
-        "storageProfile": {
-          "osDisk": {
-            "osType": "Linux",
-            "blobUri": "[parameters('image')]",
-            "storageAccountType": "Standard_LRS"
-          }
-        }
-      }
-    },
-    {
-      "apiVersion" : "[variables('apiVersion')]",
       "type": "Microsoft.Compute/disks",
       "name": "[concat(variables('vmName'),'_DataDisk1')]",
       "location": "[resourceGroup().location]",
@@ -201,7 +186,7 @@
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
-        "[concat('Microsoft.Compute/images/', concat(variables('vmName'), '-image'))]",
+        "[concat('Microsoft.Compute/images/', concat(resourceGroup().name, '-image'))]",
         "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
         "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
       ],
@@ -227,7 +212,7 @@
         },
         "storageProfile" : {
           "imageReference": {
-            "id": "[resourceId('Microsoft.Compute/images', concat(variables('vmName'), '-image'))]"
+            "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
           },
           "osDisk" : {
             "name": "[concat(variables('vmName'),'_OSDisk')]",

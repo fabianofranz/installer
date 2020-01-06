@@ -2,12 +2,6 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
-    "image" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "OS to use."
-      }
-    },
     "WorkerIgnition" : {
       "type" : "string",
       "metadata" : {
@@ -147,9 +141,6 @@
           },
           "ignition" : {
             "value" : "[parameters('WorkerIgnition')]"
-          },
-          "imageReference" : {
-            "value" : "[parameters('image')]"
           },
           "infraLoadBalancerName" : {
             "value" : "[variables('infraLoadBalancerName')]"

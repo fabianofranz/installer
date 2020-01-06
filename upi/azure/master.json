@@ -17,12 +17,6 @@
     "ignition" : {
       "type" : "string"
     },
-    "imageReference" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "imageReference object that should be used to create the virtual machine"
-      }
-    },
     "masterLoadBalancerName" : {
       "type" : "string",
       "metadata" : {
@@ -45,21 +39,6 @@
     "useridname" : "[concat(resourceGroup().name,'_userid')]"
   },
   "resources" : [
-    {
-      "apiVersion" : "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/images",
-      "name": "[concat(parameters('vmName'), '-image')]",
-      "location": "[resourceGroup().location]",
-      "properties": {
-        "storageProfile": {
-          "osDisk": {
-            "osType": "Linux",
-            "blobUri": "[parameters('imageReference')]",
-            "storageAccountType": "Standard_LRS"
-          }
-        }
-      }
-    },
     {
       "apiVersion" : "[variables('apiVersion')]",
       "type": "Microsoft.Compute/disks",
@@ -136,7 +115,7 @@
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/networkInterfaces/', concat(parameters('vmName'), 'nic'))]",
-        "[concat('Microsoft.Compute/images/', concat(parameters('vmName'), '-image'))]",
+        "[concat('Microsoft.Compute/images/', concat(resourceGroup().name, '-image'))]",
         "[concat('Microsoft.Compute/disks/', concat(parameters('vmName'), '_DataDisk1'))]",
         "[concat('Microsoft.Compute/disks/', concat(parameters('vmName'), '_DataDisk2'))]"
       ],
@@ -162,7 +141,7 @@
         },
         "storageProfile" : {
           "imageReference": {
-            "id": "[resourceId('Microsoft.Compute/images', concat(parameters('vmName'), '-image'))]"
+            "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
           },
           "osDisk" : {
             "name": "[concat(parameters('vmName'),'_OSDisk')]",

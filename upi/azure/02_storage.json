@@ -2,6 +2,12 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
+    "image" : {
+      "type" : "string",
+      "metadata" : {
+        "description" : "OS to use."
+      }
+    },
     "nodeVMSize" : {
       "type" : "string",
       "defaultValue" : "Standard_D8_v3",
@@ -79,7 +85,6 @@
     }
   },
   "variables" : {
-    "location" : "[resourceGroup().location]",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
     "vmSizesMap" : {
       "Standard_A2" : {
@@ -299,10 +304,26 @@
   },
   "resources" : [
     {
+      "apiVersion" : "2018-06-01",
+      "type": "Microsoft.Compute/images",
+      "name": "[concat(resourceGroup().name, '-image')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "storageProfile": {
+          "osDisk": {
+            "osType": "Linux",
+            "osState": "Generalized",
+            "blobUri": "[parameters('image')]",
+            "storageAccountType": "Standard_LRS"
+          }
+        }
+      }
+    },
+    {
       "type" : "Microsoft.Storage/storageAccounts",
       "name" : "[variables('nodeStorageName')]",
       "apiVersion" : "2015-06-15",
-      "location" : "[variables('location')]",
+      "location" : "[resourceGroup().location]",
       "properties" : {
         "accountType" : "[variables('vmSizesMap')[parameters('nodeVmSize')].storageAccountType]"
       }

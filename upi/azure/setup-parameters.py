@@ -26,10 +26,16 @@ with open("master.ign", "r") as ignFile:
 with open("worker.ign", "r") as ignFile:
     worker_ignition = json.load(ignFile)
 
+with open("02_storage.template.json", "r") as jsonFile:
+    data = DotMap(json.load(jsonFile))
+    data.parameters.image.value = imageURL
+    jsondata = dict(**data.toDict())
+    with open("04_bootstrap.parameters.json", "w") as jsonFile:
+        json.dump(jsondata, jsonFile)
+
 with open("04_bootstrap.template.json", "r") as jsonFile:
     data = DotMap(json.load(jsonFile))
     data.parameters.BootstrapIgnition.value = base64.b64encode(ignstr.encode()).decode()
-    data.parameters.image.value = imageURL
     data.parameters.sshKeyData.value = sshkey.rstrip()
     jsondata = dict(**data.toDict())
     with open("04_bootstrap.parameters.json", "w") as jsonFile:
@@ -38,7 +44,6 @@ with open("04_bootstrap.template.json", "r") as jsonFile:
 with open("05_masters.template.json", "r") as jsonFile:
     data = DotMap(json.load(jsonFile))
     data.parameters.MasterIgnition.value = base64.b64encode(json.dumps(master_ignition).encode()).decode()
-    data.parameters.image.value = imageURL
     data.parameters.sshKeyData.value = sshkey.rstrip()
     jsondata = dict(**data.toDict())
     with open("05_masters.parameters.json", "w") as jsonFile:
@@ -48,7 +53,6 @@ with open("06_workers.template.json", "r") as jsonFile:
     data = DotMap(json.load(jsonFile))
     data.parameters.WorkerIgnition.value = base64.b64encode(json.dumps(worker_ignition).encode()).decode()
     data.parameters.sshKeyData.value = sshkey.rstrip()
-    data.parameters.image.value = imageURL
     jsondata = dict(**data.toDict())
     with open("06_workers.parameters.json", "w") as jsonFile:
         json.dump(jsondata, jsonFile)

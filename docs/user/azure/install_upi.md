@@ -249,7 +249,7 @@ az group deployment create -g $RESOURCE_GROUP --name 01_${CLUSTER_NAME} --templa
 ### Deploy the storage account
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 02_${CLUSTER_NAME} --template-file "02_storage.json"
+az group deployment create -g $RESOURCE_GROUP --name 02_${CLUSTER_NAME} --template-file "02_storage.json" --parameters "02_storage.parameters.json"
 ```
 
 ### Deploy the load balancers
