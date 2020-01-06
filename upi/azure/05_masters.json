@@ -8,10 +8,19 @@
         "description" : "User password for the OpenShift Webconsole"
       }
     },
+    "numberOfMasters" : {
+      "type" : "int",
+      "defaultValue" : 3,
+      "minValue" : 2,
+      "maxValue" : 30,
+      "metadata" : {
+        "description" : "Number of OpenShift masters to deploy"
+      }
+    },
     "sshKeyData" : {
       "type" : "securestring",
       "metadata" : {
-        "description" : "SSH RSA public key file as a string."
+        "description" : "SSH RSA public key file as a string"
       }
     },
     "masterVMSize" : {
@@ -95,12 +104,13 @@
     "branch" : "cors-1249-azure-upi-bk",
     "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
     "baseVMachineTemplateUriMaster" : "[concat(variables('baseTemplateUrl'), 'master.json')]",
-    "virtualNetworkName" : "openshiftVnet",
-    "mastersubnetName" : "masterSubnet",
+    "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
+    "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
-    "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
-    "masterSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('mastersubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]"
+    "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('mastersubnetName'))]",
+    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+    "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
   },
   "resources" : [
     {
@@ -109,7 +119,7 @@
       "apiVersion" : "2015-01-01",
       "copy" : {
         "name" : "masterSet",
-        "count" : 3
+        "count" : "[parameters('numberOfMasters')]"
       },
       "properties" : {
         "mode" : "Incremental",
@@ -137,7 +147,7 @@
             "value" : "[variables('masterLoadBalancerName')]"
           },
           "availabilitySet" : {
-            "value" : "masteravailabilityset"
+            "value" : "[variables('masterAvailabilitySetName')]"
           },
           "sshKeyData" : {
             "value" : "[parameters('sshKeyData')]"

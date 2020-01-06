@@ -5,9 +5,6 @@
     "vmName" : {
       "type" : "string"
     },
-    "sa" : {
-      "type" : "string"
-    },
     "subnetRef" : {
       "type" : "string"
     },

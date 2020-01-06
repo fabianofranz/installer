@@ -85,6 +85,8 @@
     }
   },
   "variables" : {
+    "location" : "[resourceGroup().location]",
+    "imageName" : "[concat(resourceGroup().name, '-image')]",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
     "vmSizesMap" : {
       "Standard_A2" : {
@@ -306,8 +308,8 @@
     {
       "apiVersion" : "2018-06-01",
       "type": "Microsoft.Compute/images",
-      "name": "[concat(resourceGroup().name, '-image')]",
-      "location": "[resourceGroup().location]",
+      "name": "[variables('imageName')]",
+      "location" : "[variables('location')]",
       "properties": {
         "storageProfile": {
           "osDisk": {
@@ -323,7 +325,7 @@
       "type" : "Microsoft.Storage/storageAccounts",
       "name" : "[variables('nodeStorageName')]",
       "apiVersion" : "2015-06-15",
-      "location" : "[resourceGroup().location]",
+      "location" : "[variables('location')]",
       "properties" : {
         "accountType" : "[variables('vmSizesMap')[parameters('nodeVmSize')].storageAccountType]"
       }

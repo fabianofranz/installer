@@ -27,10 +27,10 @@ with open('manifests/cloud-provider-config.yaml') as file:
     jsonx = json.loads(jsondata, object_pairs_hook=OrderedDict)
     config = DotMap(jsonx)
     config.resourceGroup = resource_group
-    config.vnetName = "openshiftVnet"
+    config.vnetName = resource_group + "-vnet"
     config.vnetResourceGroup = resource_group
-    config.subnetName = "masterSubnet"
-    config.securityGroupName = "master1nsg"
+    config.subnetName = resource_group + "master-subnet"
+    config.securityGroupName = "master01nsg"
     config.routeTableName = ""
     config.azure_resourcegroup = resource_group
     jsondata = json.dumps(dict(**config.toDict()), indent='\t')

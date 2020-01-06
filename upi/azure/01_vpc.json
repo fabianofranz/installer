@@ -3,12 +3,14 @@
   "contentVersion" : "1.0.0.0",
   "variables" : {
     "location" : "[resourceGroup().location]",
-    "virtualNetworkName" : "openshiftVnet",
+    "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
     "addressPrefix" : "10.0.0.0/16",
-    "nodesubnetName" : "nodeSubnet",
-    "nodesubnetPrefix" : "10.0.1.0/24",
-    "mastersubnetName" : "masterSubnet",
-    "mastersubnetPrefix" : "10.0.0.0/24"
+    "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
+    "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
+    "masterSubnetPrefix" : "10.0.0.0/24",
+    "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
+    "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
+    "nodeSubnetPrefix" : "10.0.1.0/24"
   },
   "resources" : [
     {
@@ -27,15 +29,15 @@
         },
         "subnets" : [
           {
-            "name" : "[variables('nodesubnetName')]",
+            "name" : "[variables('nodeSubnetName')]",
             "properties" : {
-              "addressPrefix" : "[variables('nodesubnetPrefix')]"
+              "addressPrefix" : "[variables('nodeSubnetPrefix')]"
             }
           },
           {
-            "name" : "[variables('mastersubnetName')]",
+            "name" : "[variables('masterSubnetName')]",
             "properties" : {
-              "addressPrefix" : "[variables('mastersubnetPrefix')]"
+              "addressPrefix" : "[variables('masterSubnetPrefix')]"
             }
           }
         ]
@@ -43,7 +45,7 @@
     },
     {
       "type" : "Microsoft.Compute/availabilitySets",
-      "name" : "masteravailabilityset",
+      "name" : "[variables('masterAvailabilitySetName')]",
       "location" : "[variables('location')]",
       "apiVersion" : "2018-10-01",
       "properties": {
@@ -55,7 +57,7 @@
     },
     {
       "type" : "Microsoft.Compute/availabilitySets",
-      "name" : "nodeavailabilityset",
+      "name" : "[variables('nodeAvailabilitySetName')]",
       "location" : "[variables('location')]",
       "apiVersion" : "2018-10-01",
       "properties": {

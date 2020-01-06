@@ -14,13 +14,13 @@
       "minValue" : 2,
       "maxValue" : 30,
       "metadata" : {
-        "description" : "Number of OpenShift Nodes to deploy (max 30)"
+        "description" : "Number of OpenShift nodes to deploy"
       }
     },
     "sshKeyData" : {
       "type" : "securestring",
       "metadata" : {
-        "description" : "SSH RSA public key file as a string."
+        "description" : "SSH RSA public key file as a string"
       }
     },
     "nodeVMSize" : {
@@ -104,12 +104,13 @@
     "branch" : "cors-1249-azure-upi-bk",
     "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
     "baseVMachineTemplateUriNode" : "[concat(variables('baseTemplateUrl'), 'node.json')]",
-    "virtualNetworkName" : "openshiftVnet",
-    "nodesubnetName" : "nodeSubnet",
+    "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
+    "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
+    "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
     "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
-    "vnetId" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
-    "nodeSubnetRef" : "[concat(variables('vnetId'), '/subnets/', variables('nodesubnetName'))]",
-    "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]"
+    "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
+   "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]"
   },
   "resources" : [
     {
@@ -146,7 +147,7 @@
             "value" : "[variables('infraLoadBalancerName')]"
           },
           "availabilitySet" : {
-            "value" : "nodeavailabilityset"
+            "value" : "[variables('nodeAvailabilitySetName')]"
           },
           "sshKeyData" : {
             "value" : "[parameters('sshKeyData')]"
