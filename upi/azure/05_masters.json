@@ -2,7 +2,7 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
-    "MasterIgnition" : {
+    "masterIgnition" : {
       "type" : "string",
       "metadata" : {
         "description" : "User password for the OpenShift Webconsole"
@@ -131,7 +131,7 @@
             "value" : "[parameters('masterVMSize')]"
           },
           "ignition" : {
-            "value" : "[parameters('MasterIgnition')]"
+            "value" : "[parameters('masterIgnition')]"
           },
           "masterLoadBalancerName" : {
             "value" : "[variables('masterLoadBalancerName')]"

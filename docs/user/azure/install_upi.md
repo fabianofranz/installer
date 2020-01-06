@@ -41,7 +41,7 @@ INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Pull Secret [? for help]
 ```
 
-#### Empty the compute pool
+<!-- #### Empty the compute pool
 
 We'll be providing the control-plane and compute machines ourselves, so edit the resulting `install-config.yaml` to set `replicas` to 0 for the `compute` pool:
 
@@ -53,7 +53,7 @@ data = yaml.full_load(open(path));
 data["compute"][0]["replicas"] = 0;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 ```
-
+ -->
 #### Extract data from install config
 
 Some data from the install configuration will be used on later steps. Export them as environment variables with:
@@ -151,11 +151,8 @@ $ tree
 ├── 02_storage.json
 ├── 03_infra.json
 ├── 04_bootstrap.json
-├── 04_bootstrap.template.json
 ├── 05_masters.json
-├── 05_masters.template.json
 ├── 06_workers.json
-├── 06_workers.template.json
 ├── auth
 │   ├── kubeadmin-password
 │   └── kubeconfig
@@ -205,7 +202,7 @@ Create a blob storage container and copy the image:
 
 ```sh
 az storage container create --name vhd --account-name sa${CLUSTER_NAME}
-az storage blob copy start --account-name sa${CLUSTER_NAME} --account-key "$ACCOUNT_KEY" --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
+az storage blob copy start --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
 ```
 
 To track the progress, you can use:
@@ -218,6 +215,12 @@ do
 done
 ```
 
+Store the URL of the copied image for later use:
+
+```sh
+export VHD_BLOB_URL=`az storage blob url --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
+```
+
 ### Upload the ignition file
 
 Create a blob storage container and upload the bootstrap.ign file:
@@ -225,31 +228,30 @@ Create a blob storage container and upload the bootstrap.ign file:
 ```sh
 az storage container create --name files --account-name sa${CLUSTER_NAME} --public-access blob
 az storage blob upload --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
-export BOOTSTRAPURL=`az storage blob url --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
-```
-
-### Create a template parameters file
-
-The key part of this UPI deployment are the [Azure Resource Manager][azuretemplates] templates, which are responsible
-for deploying most resources. The templated exposes some of its configurations as deployment parameters in separate templates.
-Run the Python script below to generate the `*.parameters.json` files based on the generated ignition files.
-
-```sh
-python3 setup-parameters.py $BOOTSTRAPURL sa${CLUSTER_NAME} "${SSH_KEY}"
+export BOOTSTRAP_URL=`az storage blob url --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
 ```
 
 ## Deployment
 
+The key part of this UPI deployment are the [Azure Resource Manager][azuretemplates] templates, which are responsible
+for deploying most resources. They're provided as a few json files named following the "NN_name.json" pattern. In the
+next steps we're going to deploy each one of them in order, providing the expected parameters.
+
 ### Deploy the VPC
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 01_${CLUSTER_NAME} --template-file "01_vpc.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 01_${CLUSTER_NAME} \
+  --template-file "01_vpc.json"
 ```
 
 ### Deploy the storage account
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 02_${CLUSTER_NAME} --template-file "02_storage.json" --parameters "02_storage.parameters.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 02_${CLUSTER_NAME} \
+  --template-file "02_storage.json" \
+  --parameters vhdBlobURL="${VHD_BLOB_URL}"
 ```
 
 ### Deploy the load balancers
@@ -261,8 +263,12 @@ az network public-ip create -g $RESOURCE_GROUP -n $CLUSTER_NAME --allocation-met
 az network public-ip create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}app --allocation-method static --sku Standard
 ```
 
+Deploy them:
+
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 03_${CLUSTER_NAME} --template-file "03_infra.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 03_${CLUSTER_NAME} \
+  --template-file "03_infra.json"
 ```
 
 Create DNS records for the public load balancer:
@@ -297,7 +303,11 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 ### Launch the temporary cluster bootstrap
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 04_${CLUSTER_NAME} --template-file "04_bootstrap.json" --parameters "04_bootstrap.parameters.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 04_${CLUSTER_NAME} \
+  --template-file "04_bootstrap.json" \
+  --parameters bootstrapIgnition="`python3 setup-bootstrap-ignition.py $BOOTSTRAP_URL`" \
+  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
 ```
 
 Create private DNS records for the bootstrap:
@@ -315,7 +325,11 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 ### Deploy the masters
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 05_${CLUSTER_NAME} --template-file "05_masters.json" --parameters "05_masters.parameters.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 05_${CLUSTER_NAME} \
+  --template-file "05_masters.json" \
+  --parameters masterIgnition="`cat master.ign | base64`" \
+  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
 ```
 
 Create private DNS records for the control plane:
@@ -337,9 +351,36 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
+### Wait for the bootstrap complete
+
+Wait until cluster bootstrapping has completed:
+
+```console
+$ openshift-install wait-for bootstrap-complete --log-level debug
+DEBUG OpenShift Installer v4.n
+DEBUG Built from commit 6b629f0c847887f22c7a95586e49b0e2434161ca
+INFO Waiting up to 30m0s for the Kubernetes API at https://api.basedomain.com:6443...
+DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
+DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
+DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
+DEBUG Still waiting for the Kubernetes API: Get https://api.basedomain.com:6443/version?timeout=32s: dial tcp: connect: connection refused
+INFO API v1.14.n up
+INFO Waiting up to 30m0s for bootstrapping to complete...
+DEBUG Bootstrap status: complete
+INFO It is now safe to remove the bootstrap resources
+```
+
+Once the bootstrapping process is complete you can deallocate and delete bootstrap resources:
+
+```sh
+az vm stop -g $RESOURCE_GROUP --name bootstrap-0
+az vm deallocate -g $RESOURCE_GROUP --name bootstrap-0 --no-wait
+az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${CLUSTER_NAME} --container-name files --name bootstrap.ign
+```
+
 ### Access the OpenShift API
 
-You can use the `oc` or `kubectl` commands to talk to the OpenShift API. The admin credentials are in `auth/kubeconfig`:
+You can use the `oc` or `kubectl` commands to talk to the OpenShift API. The admin credentials are in `auth/kubeconfig`. For example:
 
 ```sh
 export KUBECONFIG="$PWD/auth/kubeconfig"
@@ -352,113 +393,73 @@ oc get clusteroperator
 ### Deploy the workers
 
 ```sh
-az group deployment create -g $RESOURCE_GROUP --name 06_${CLUSTER_NAME} --template-file "06_workers.json" --parameters "06_workers.parameters.json"
+az group deployment create -g $RESOURCE_GROUP \
+  --name 06_${CLUSTER_NAME} \
+  --template-file "06_workers.json" \
+  --parameters workerIgnition="`cat worker.ign | base64`" \
+  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
 ```
 
 ### Approve the worker CSRs
 
-TODO improve this section, actual console output
-
 Even after they've booted up, the workers will not show up in `oc get nodes`.
 
-Instead, they will create certificate signing requests (CSRs) which need to be approved. You can watch for the CSRs here:
+Instead, they will create certificate signing requests (CSRs) which need to be approved. Eventually, you should see `Pending` entries looking like this
 
-```sh
-$ watch oc get csr -A
-```
-
-Eventually, you should see `Pending` entries looking like this
-
-```sh
+```console
 $ oc get csr -A
 NAME        AGE    REQUESTOR                                                                   CONDITION
-csr-2scwb   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-5jwqf   16m    system:node:openshift-qlvwv-master-0                                         Approved,Issued
-csr-88jp8   116s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
-csr-9dt8f   15m    system:node:openshift-qlvwv-master-1                                         Approved,Issued
-csr-bqkw5   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-dpprd   6s     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
-csr-dtcws   24s    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
-csr-lj7f9   16m    system:node:openshift-qlvwv-master-2                                         Approved,Issued
-csr-lrtlk   15m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-wkm94   16m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-576l2   19m    system:node:master03                                                        Approved,Issued
+csr-5ztvt   19m    system:node:master02                                                        Approved,Issued
+csr-8bppf   2m8s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-dj2w4   112s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-htmtm   19m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-ph8s8   11s    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Pending
+csr-q7f6q   19m    system:node:master01                                                        Approved,Issued
+csr-wpvxq   19m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+csr-xpp49   19m    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
 ```
 
-You should inspect each pending CSR and verify that it comes from a node you recognise:
+You should inspect each pending CSR with the `oc describe csr <name>` command and verify that it comes from a node you recognise. If it does, they can be approved:
 
-```
-$ oc describe csr csr-88jp8
-Name:               csr-88jp8
-Labels:             <none>
-Annotations:        <none>
-CreationTimestamp:  Wed, 23 Oct 2019 13:22:51 +0200
-Requesting User:    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper
-Status:             Pending
-Subject:
-         Common Name:    system:node:openshift-qlvwv-worker-0
-         Serial Number:
-         Organization:   system:nodes
-Events:  <none>
+```console
+$ oc adm certificate approve csr-8bppf csr-dj2w4 csr-ph8s8
+certificatesigningrequest.certificates.k8s.io/csr-8bppf approved
+certificatesigningrequest.certificates.k8s.io/csr-dj2w4 approved
+certificatesigningrequest.certificates.k8s.io/csr-ph8s8 approved
 ```
 
-If it does (this one is for `openshift-qlvwv-worker-0` which we've created earlier), you can approve it:
+Approved nodes should now show up in `oc get nodes`, but they will be in the `NotReady` state. They will create a second CSR which must also be reviewed and approved:
 
-```sh
-$ oc adm certificate approve csr-88jp8
-```
-
-Approved nodes should now show up in `oc get nodes`, but they will be in the `NotReady` state. They will create a second CSR which you should also review:
-
-```sh
+```console
 $ oc get csr -A
 NAME        AGE     REQUESTOR                                                                   CONDITION
-csr-2scwb   17m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-5jwqf   17m     system:node:openshift-qlvwv-master-0                                         Approved,Issued
-csr-7mv4d   13s     system:node:openshift-qlvwv-worker-1                                         Pending
-csr-88jp8   3m29s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-9dt8f   17m     system:node:openshift-qlvwv-master-1                                         Approved,Issued
-csr-bqkw5   18m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-bx7p4   28s     system:node:openshift-qlvwv-worker-0                                         Pending
-csr-dpprd   99s     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-dtcws   117s    system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-lj7f9   17m     system:node:openshift-qlvwv-master-2                                         Approved,Issued
-csr-lrtlk   17m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-wkm94   18m     system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
-csr-wqpfd   21s     system:node:openshift-qlvwv-worker-2                                         Pending
+csr-882gw   35s     system:node:node03                                                          Pending
+csr-cxgk9   38s     system:node:node02                                                          Pending
+csr-wjdfw   34s     system:node:node01                                                          Pending
+csr-8bppf   3m37s   system:serviceaccount:openshift-machine-config-operator:node-bootstrapper   Approved,Issued
+...
 ```
 
-(we see the CSR approved earlier as well as a new `Pending` one for the same node: `openshift-qlvwv-worker-0`)
+Once all CSR's are approved, the node should switch to `Ready` and pods will be scheduled on it.
 
-And approve:
-
-```sh
-$ oc adm certificate approve csr-bx7p4
+```console
+$ oc get nodes
+NAME       STATUS   ROLES    AGE     VERSION
+master01   Ready    master   23m     v1.14.6+cebabbf7a
+master02   Ready    master   23m     v1.14.6+cebabbf7a
+master03   Ready    master   23m     v1.14.6+cebabbf7a
+node01     Ready    worker   2m30s   v1.14.6+cebabbf7a
+node02     Ready    worker   2m35s   v1.14.6+cebabbf7a
+node03     Ready    worker   2m34s   v1.14.6+cebabbf7a
 ```
 
-Once this CSR is approved, the node should switch to `Ready` and pods will be scheduled on it.
-
-### Wait for the bootstrap and installation complete
-
-Wait until cluster bootstrapping has completed:
-
-```sh
-openshift-install wait-for bootstrap-complete --log-level debug
-```
+### Wait for the installation complete
 
 Wait until cluster is ready:
 
 ```sh
 openshift-install wait-for install-complete --log-level debug
-```
-
-### Post-installation cleanup
-
-Once the installation is complete you can deallocate and delete bootstrap resources:
-
-```sh
-az vm stop -g $RESOURCE_GROUP --name bootstrap-0
-az vm deallocate -g $RESOURCE_GROUP --name bootstrap-0 --no-wait
-az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${CLUSTER_NAME} --container-name files --name bootstrap.ign
 ```
 
 [azuretemplates]: https://docs.microsoft.com/en-us/azure/azure-resource-manager/template-deployment-overview

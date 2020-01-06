@@ -2,10 +2,10 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
-    "image" : {
+    "vhdBlobURL" : {
       "type" : "string",
       "metadata" : {
-        "description" : "OS to use."
+        "description" : "URL pointing to the blob where the VHD to be used to create master and worker machines is located"
       }
     },
     "nodeVMSize" : {
@@ -313,7 +313,7 @@
           "osDisk": {
             "osType": "Linux",
             "osState": "Generalized",
-            "blobUri": "[parameters('image')]",
+            "blobUri": "[parameters('vhdBlobURL')]",
             "storageAccountType": "Standard_LRS"
           }
         }

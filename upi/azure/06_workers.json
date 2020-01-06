@@ -2,7 +2,7 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
-    "WorkerIgnition" : {
+    "workerIgnition" : {
       "type" : "string",
       "metadata" : {
         "description" : "User password for the OpenShift Webconsole"
@@ -140,7 +140,7 @@
             "value" : "[parameters('nodeVMSize')]"
           },
           "ignition" : {
-            "value" : "[parameters('WorkerIgnition')]"
+            "value" : "[parameters('workerIgnition')]"
           },
           "infraLoadBalancerName" : {
             "value" : "[variables('infraLoadBalancerName')]"

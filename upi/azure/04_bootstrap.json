@@ -2,13 +2,7 @@
   "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
-    "image" : {
-      "type" : "string",
-      "metadata" : {
-        "description" : "OS to use."
-      }
-    },
-    "BootstrapIgnition" : {
+    "bootstrapIgnition" : {
       "type" : "string",
       "minLength" : 1,
       "metadata" : {
@@ -186,7 +180,6 @@
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
-        "[concat('Microsoft.Compute/images/', concat(resourceGroup().name, '-image'))]",
         "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
         "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
       ],
@@ -197,7 +190,7 @@
         "osProfile" : {
           "computerName" : "[variables('vmName')]",
           "adminUsername" : "core",
-          "customData" : "[parameters('BootstrapIgnition')]",
+          "customData" : "[parameters('bootstrapIgnition')]",
           "linuxConfiguration" : {
             "disablePasswordAuthentication" : "true",
             "ssh" : {
