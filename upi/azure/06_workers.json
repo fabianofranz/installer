@@ -5,7 +5,7 @@
     "workerIgnition" : {
       "type" : "string",
       "metadata" : {
-        "description" : "User password for the OpenShift Webconsole"
+        "description" : "Ignition content for the worker nodes"
       }
     },
     "numberOfNodes" : {
@@ -100,61 +100,157 @@
     }
   },
   "variables" : {
-    "gituser" : "fabianofranz",
-    "branch" : "cors-1249-azure-upi-bk",
-    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
-    "baseVMachineTemplateUriNode" : "[concat(variables('baseTemplateUrl'), 'node.json')]",
     "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
     "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
-    "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
-   "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]"
+    "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]",
+    "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+    "copy" : [
+      {
+        "name" : "vmNames",
+        "count" :  "[parameters('numberOfNodes')]",
+        "input" : "[concat('node',padLeft(copyIndex('vmNames', 1), 2, '0'))]"
+      }
+    ]
   },
   "resources" : [
     {
-      "name" : "[concat('node', copyindex())]",
+      "apiVersion" : "2019-05-01",
+      "name" : "[concat('node', copyIndex())]",
       "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
       "copy" : {
-        "name" : "nodeSet",
-        "count" : "[parameters('numberOfNodes')]"
+        "name" : "nodeCopy",
+        "count" : "[length(variables('vmNames'))]"
       },
       "properties" : {
         "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriNode')]",
-          "contentVersion" : "1.0.0.0"
-        },
-        "parameters" : {
-          "vmName" : {
-            "value" : "[concat('node', padLeft(add(copyindex(), 1), 2, '0'))]"
-          },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('nodeSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('nodeVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('workerIgnition')]"
-          },
-          "infraLoadBalancerName" : {
-            "value" : "[variables('infraLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "[variables('nodeAvailabilitySetName')]"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          }
+        "template" : {
+          "$schema" : "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+          "contentVersion" : "1.0.0.0",
+          "resources" : [
+            {
+              "apiVersion" : "2018-06-01",
+              "type": "Microsoft.Compute/disks",
+              "name": "[concat(variables('vmNames')[copyIndex()],'_DataDisk1')]",
+              "location": "[resourceGroup().location]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "properties": {
+                "creationData": {
+                  "createOption": "Empty"
+                },
+                "diskSizeGB": 128
+              }
+            },
+            {
+              "apiVersion" : "2018-06-01",
+              "type" : "Microsoft.Network/networkInterfaces",
+              "name" : "[concat(variables('vmNames')[copyIndex()], 'nic')]",
+              "location" : "[resourceGroup().location]",
+              "tags" : {
+                "displayName" : "NetworkInterface"
+              },
+              "properties" : {
+                "ipConfigurations" : [
+                  {
+                    "name" : "ipconfig1",
+                    "properties" : {
+                      "privateIPAllocationMethod" : "Dynamic",
+                      "subnet" : {
+                        "id" : "[variables('nodeSubnetRef')]"
+                      },
+                      "loadBalancerBackendAddressPools" : [
+                        {
+                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('infraLoadBalancerName'), '/backendAddressPools/AppLoadBalancerBackEnd')]"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "apiVersion" : "2018-06-01",
+              "type" : "Microsoft.Compute/virtualMachines",
+              "name" : "[variables('vmNames')[copyIndex()]]",
+              "location" : "[resourceGroup().location]",
+              "tags" : {
+                "displayName" : "VirtualMachine"
+              },
+              "dependsOn" : [
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], 'nic'))]",
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '_DataDisk1'))]",
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '_DataDisk2'))]"
+              ],
+              "properties" : {
+                "hardwareProfile" : {
+                  "vmSize" : "[parameters('nodeVMSize')]"
+                },
+                "osProfile" : {
+                  "computerName" : "[variables('vmNames')[copyIndex()]]",
+                  "adminUsername" : "core",
+                  "customData" : "[parameters('workerIgnition')]",
+                  "linuxConfiguration" : {
+                    "disablePasswordAuthentication" : true,
+                    "ssh" : {
+                      "publicKeys" : [
+                        {
+                          "path" : "[variables('sshKeyPath')]",
+                          "keyData" : "[parameters('sshKeyData')]"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "storageProfile" : {
+                  "imageReference": {
+                    "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
+                  },
+                  "osDisk" : {
+                    "name": "[concat(variables('vmNames')[copyIndex()],'_OSDisk')]",
+                    "osType" : "Linux",
+                    "createOption" : "FromImage",
+                    "managedDisk": {
+                      "storageAccountType": "Standard_LRS"
+                    }
+                  },
+                  "dataDisks": [
+                    {
+                      "lun": 0,
+                      "name": "[concat(variables('vmNames')[copyIndex()],'_DataDisk1')]",
+                      "createOption": "attach",
+                      "managedDisk": {
+                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()],'_DataDisk1'))]"
+                      }
+                    },
+                    {
+                      "lun": 1,
+                      "name": "[concat(variables('vmNames')[copyIndex()],'_DataDisk2')]",
+                      "createOption": "attach",
+                      "managedDisk": {
+                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()],'_DataDisk2'))]"
+                      }
+                    }
+                  ]
+                },
+                "networkProfile" : {
+                  "networkInterfaces" : [
+                    {
+                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], 'nic'))]"
+                    }
+                  ]
+                },
+                "availabilitySet" : {
+                  "id" : "[resourceId('Microsoft.Compute/availabilitySets', variables('nodeAvailabilitySetName'))]"
+                }
+              }
+            }
+          ]
         }
       }
     }
-  ],
-  "outputs" : {}
+  ]
 }
