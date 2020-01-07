@@ -182,8 +182,7 @@
               },
               "dependsOn" : [
                 "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], 'nic'))]",
-                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '_DataDisk1'))]",
-                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '_DataDisk2'))]"
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '_DataDisk1'))]"
               ],
               "properties" : {
                 "hardwareProfile" : {
@@ -224,14 +223,6 @@
                       "createOption": "attach",
                       "managedDisk": {
                         "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()],'_DataDisk1'))]"
-                      }
-                    },
-                    {
-                      "lun": 1,
-                      "name": "[concat(variables('vmNames')[copyIndex()],'_DataDisk2')]",
-                      "createOption": "attach",
-                      "managedDisk": {
-                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()],'_DataDisk2'))]"
                       }
                     }
                   ]
