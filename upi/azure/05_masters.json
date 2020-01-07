@@ -1,5 +1,5 @@
 {
-  "$schema" : "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "$schema" : "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion" : "1.0.0.0",
   "parameters" : {
     "masterIgnition" : {
@@ -99,59 +99,204 @@
       }
     }
   },
-  "variables" : {
-    "gituser" : "fabianofranz",
-    "branch" : "cors-1249-azure-upi-bk",
-    "baseTemplateUrl" : "[concat('https://raw.githubusercontent.com/',variables('gituser'),'/installer/',variables('branch'),'/upi/azure/')]",
-    "baseVMachineTemplateUriMaster" : "[concat(variables('baseTemplateUrl'), 'master.json')]",
-    "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
-    "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
-    "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
-    "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
-    "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('mastersubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
-    "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
-  },
   "resources" : [
     {
+      "apiVersion" : "2017-05-10",
       "name" : "[concat('master', copyindex())]",
       "type" : "Microsoft.Resources/deployments",
-      "apiVersion" : "2015-01-01",
       "copy" : {
         "name" : "masterSet",
         "count" : "[parameters('numberOfMasters')]"
       },
       "properties" : {
-        "mode" : "Incremental",
-        "templateLink" : {
-          "uri" : "[variables('baseVMachineTemplateUriMaster')]",
-          "contentVersion" : "1.0.0.0"
+        "expressionEvaluationOptions": {
+          "scope": "inner"
         },
-        "parameters" : {
-          "vmName" : {
-            "value" : "[concat('master', padLeft(add(copyindex(), 1), 2, '0'))]"
+        "mode" : "Incremental",
+        "template" : {
+          "$schema" : "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+          "contentVersion" : "1.0.0.0",
+          "variables" : {
+            "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
+            "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+            "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
+            "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('mastersubnetName'))]",
+            "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+            "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
+            "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+            "useridname" : "[concat(resourceGroup().name,'_userid')]",
+            "vmName" : "[concat('master', padLeft(add(copyindex(), 1), 2, '0'))]"
           },
-          "sa" : {
-            "value" : "[variables('nodeStorageName')]"
-          },
-          "subnetRef" : {
-            "value" : "[variables('masterSubnetRef')]"
-          },
-          "vmSize" : {
-            "value" : "[parameters('masterVMSize')]"
-          },
-          "ignition" : {
-            "value" : "[parameters('masterIgnition')]"
-          },
-          "masterLoadBalancerName" : {
-            "value" : "[variables('masterLoadBalancerName')]"
-          },
-          "availabilitySet" : {
-            "value" : "[variables('masterAvailabilitySetName')]"
-          },
-          "sshKeyData" : {
-            "value" : "[parameters('sshKeyData')]"
-          }
+          "resources" : [
+            {
+              "apiVersion" : "2018-06-01",
+              "type": "Microsoft.Compute/disks",
+              "name": "[concat(variables('vmName'),'_DataDisk1')]",
+              "location": "[resourceGroup().location]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "properties": {
+                "creationData": {
+                  "createOption": "Empty"
+                },
+                "diskSizeGB": 128
+              }
+            },
+            {
+              "apiVersion" : "2018-06-01",
+              "type": "Microsoft.Compute/disks",
+              "name": "[concat(variables('vmName'),'_DataDisk2')]",
+              "location": "[resourceGroup().location]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "properties": {
+                "creationData": {
+                  "createOption": "Empty"
+                },
+                "diskSizeGB": 128
+              }
+            },
+            {
+              "apiVersion" : "2018-06-01",
+              "type" : "Microsoft.Network/networkInterfaces",
+              "name" : "[concat(variables('vmName'), 'nic')]",
+              "location" : "[resourceGroup().location]",
+              "dependsOn" : [
+                "[concat('Microsoft.Network/networkSecurityGroups/', concat(variables('vmName'), 'nsg'))]"
+              ],
+              "properties" : {
+                "ipConfigurations" : [
+                  {
+                    "name" : "ipconfig1",
+                    "properties" : {
+                      "privateIPAllocationMethod" : "Dynamic",
+                      "subnet" : {
+                        "id" : "[variables('masterSubnetRef')]"
+                      },
+                      "loadBalancerBackendAddressPools" : [
+                        {
+                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
+                        },
+                        {
+                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name,'intlb', '/backendAddressPools/masters')]"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "networkSecurityGroup" : {
+                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmName'), 'nsg'))]"
+                }
+              }
+            },
+            {
+              "apiVersion" : "2018-06-01",
+              "type" : "Microsoft.Compute/virtualMachines",
+              "name" : "[variables('vmName')]",
+              "location" : "[resourceGroup().location]",
+              "identity" : {
+                "type" : "userAssigned",
+                "userAssignedIdentities" : {
+                  "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/',variables('useridname'))]" : {}
+                }
+              },
+              "dependsOn" : [
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
+              ],
+              "properties" : {
+                "hardwareProfile" : {
+                  "vmSize" : "[parameters('masterVMSize')]"
+                },
+                "osProfile" : {
+                  "computerName" : "[variables('vmName')]",
+                  "adminUsername" : "core",
+                  "customData" : "[parameters('masterIgnition')]",
+                  "linuxConfiguration" : {
+                    "disablePasswordAuthentication" : "true",
+                    "ssh" : {
+                      "publicKeys" : [
+                        {
+                          "path" : "[variables('sshKeyPath')]",
+                          "keyData" : "[parameters('sshKeyData')]"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "storageProfile" : {
+                  "imageReference": {
+                    "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
+                  },
+                  "osDisk" : {
+                    "name": "[concat(variables('vmName'),'_OSDisk')]",
+                    "osType" : "Linux",
+                    "createOption" : "FromImage",
+                    "managedDisk": {
+                      "storageAccountType": "Standard_LRS"
+                    }
+                  },
+                  "dataDisks": [
+                    {
+                      "lun": 0,
+                      "name": "[concat(variables('vmName'),'_DataDisk1')]",
+                      "createOption": "attach",
+                      "managedDisk": {
+                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk1'))]"
+                      }
+                    },
+                    {
+                      "lun": 1,
+                      "name": "[concat(variables('vmName'),'_DataDisk2')]",
+                      "createOption": "attach",
+                      "managedDisk": {
+                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk2'))]"
+                      }
+                    }
+                  ]
+                },
+                "networkProfile" : {
+                  "networkInterfaces" : [
+                    {
+                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmName'), 'nic'))]"
+                    }
+                  ]
+                },
+                "availabilitySet" : {
+                  "id" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]"
+                }
+              }
+            },
+            {
+              "type" : "Microsoft.Network/networkSecurityGroups",
+              "name" : "[concat(variables('vmName'), 'nsg')]",
+              "tags" : {
+                "displayName" : "NetworkSecurityGroup"
+              },
+              "apiVersion" : "2018-06-01",
+              "location" : "[resourceGroup().location]",
+              "properties" : {
+                "securityRules" : [
+                  {
+                    "name" : "default-allow-openshift-master",
+                    "properties" : {
+                      "protocol" : "Tcp",
+                      "sourcePortRange" : "*",
+                      "destinationPortRange" : "6443",
+                      "sourceAddressPrefix" : "*",
+                      "destinationAddressPrefix" : "*",
+                      "access" : "Allow",
+                      "priority" : 2000,
+                      "direction" : "Inbound"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       }
     }
