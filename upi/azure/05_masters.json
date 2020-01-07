@@ -5,7 +5,7 @@
     "masterIgnition" : {
       "type" : "string",
       "metadata" : {
-        "description" : "User password for the OpenShift Webconsole"
+        "description" : "Ignition content for the master nodes"
       }
     },
     "numberOfMasters" : {
@@ -145,21 +145,6 @@
             },
             {
               "apiVersion" : "2018-06-01",
-              "type": "Microsoft.Compute/disks",
-              "name": "[concat(variables('vmName'),'_DataDisk2')]",
-              "location": "[resourceGroup().location]",
-              "sku": {
-                "name": "Standard_LRS"
-              },
-              "properties": {
-                "creationData": {
-                  "createOption": "Empty"
-                },
-                "diskSizeGB": 128
-              }
-            },
-            {
-              "apiVersion" : "2018-06-01",
               "type" : "Microsoft.Network/networkInterfaces",
               "name" : "[concat(variables('vmName'), 'nic')]",
               "location" : "[resourceGroup().location]",
@@ -204,8 +189,7 @@
               },
               "dependsOn" : [
                 "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
-                "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
-                "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
+                "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]"
               ],
               "properties" : {
                 "hardwareProfile" : {
@@ -246,14 +230,6 @@
                       "createOption": "attach",
                       "managedDisk": {
                         "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk1'))]"
-                      }
-                    },
-                    {
-                      "lun": 1,
-                      "name": "[concat(variables('vmName'),'_DataDisk2')]",
-                      "createOption": "attach",
-                      "managedDisk": {
-                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk2'))]"
                       }
                     }
                   ]

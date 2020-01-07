@@ -123,21 +123,6 @@
     },
     {
       "apiVersion" : "[variables('apiVersion')]",
-      "type": "Microsoft.Compute/disks",
-      "name": "[concat(variables('vmName'),'_DataDisk2')]",
-      "location" : "[variables('location')]",
-      "sku": {
-        "name": "Standard_LRS"
-      },
-      "properties": {
-        "creationData": {
-          "createOption": "Empty"
-        },
-        "diskSizeGB": 128
-      }
-    },
-    {
-      "apiVersion" : "[variables('apiVersion')]",
       "type" : "Microsoft.Network/networkInterfaces",
       "name" : "[concat(variables('vmName'), 'nic')]",
       "location" : "[variables('location')]",
@@ -182,8 +167,7 @@
       },
       "dependsOn" : [
         "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
-        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]",
-        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk2'))]"
+        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]"
       ],
       "properties" : {
         "hardwareProfile" : {
@@ -224,14 +208,6 @@
               "createOption": "attach",
               "managedDisk": {
                 "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk1'))]"
-              }
-            },
-            {
-              "lun": 1,
-              "name": "[concat(variables('vmName'),'_DataDisk2')]",
-              "createOption": "attach",
-              "managedDisk": {
-                "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk2'))]"
               }
             }
           ]
