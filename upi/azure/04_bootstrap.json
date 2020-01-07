@@ -97,19 +97,21 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+    "masterLoadBalancerName" : "[concat('MasterLb', resourceGroup().name)]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "masterAvailabilitySetID" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]",
-    "apiVersion" : "2018-06-01",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
-    "useridname" : "[concat(resourceGroup().name,'_userid')]",
-    "vmName": "bootstrap-0"
+    "useridname" : "[concat(resourceGroup().name, '_userid')]",
+    "vmName" : "[concat(resourceGroup().name, '-bootstrap')]",
+    "nicName" : "[concat(variables('vmName'), '-nic')]",
+    "nsgName" : "[concat(variables('vmName'), '-nsg')]",
+    "imageName" : "[concat(resourceGroup().name, '-image')]"
   },
   "resources" : [
     {
-      "apiVersion" : "[variables('apiVersion')]",
+      "apiVersion" : "2018-06-01",
       "type": "Microsoft.Compute/disks",
-      "name": "[concat(variables('vmName'),'_DataDisk1')]",
+      "name": "[concat(variables('vmName'), '-datadisk1')]",
       "location" : "[variables('location')]",
       "sku": {
         "name": "Standard_LRS"
@@ -122,12 +124,12 @@
       }
     },
     {
-      "apiVersion" : "[variables('apiVersion')]",
+      "apiVersion" : "2018-06-01",
       "type" : "Microsoft.Network/networkInterfaces",
-      "name" : "[concat(variables('vmName'), 'nic')]",
+      "name" : "[variables('nicName')]",
       "location" : "[variables('location')]",
       "dependsOn" : [
-        "[concat('Microsoft.Network/networkSecurityGroups/', concat(variables('vmName'), 'nsg'))]"
+        "[concat('Microsoft.Network/networkSecurityGroups/', variables('nsgName'))]"
       ],
       "properties" : {
         "ipConfigurations" : [
@@ -143,31 +145,31 @@
                   "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
                 },
                 {
-                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name,'intlb', '/backendAddressPools/masters')]"
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name, 'intlb', '/backendAddressPools/masters')]"
                 }
               ]
             }
           }
         ],
         "networkSecurityGroup" : {
-          "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmName'), 'nsg'))]"
+          "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
         }
       }
     },
     {
-      "apiVersion" : "[variables('apiVersion')]",
+      "apiVersion" : "2018-06-01",
       "type" : "Microsoft.Compute/virtualMachines",
       "name" : "[variables('vmName')]",
       "location" : "[variables('location')]",
       "identity" : {
         "type" : "userAssigned",
         "userAssignedIdentities" : {
-          "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/',variables('useridname'))]" : {}
+          "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('useridname'))]" : {}
         }
       },
       "dependsOn" : [
-        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmName'), 'nic'))]",
-        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '_DataDisk1'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]",
+        "[concat('Microsoft.Compute/disks/', concat(variables('vmName'), '-datadisk1'))]"
       ],
       "properties" : {
         "hardwareProfile" : {
@@ -178,7 +180,7 @@
           "adminUsername" : "core",
           "customData" : "[parameters('bootstrapIgnition')]",
           "linuxConfiguration" : {
-            "disablePasswordAuthentication" : "true",
+            "disablePasswordAuthentication" : true,
             "ssh" : {
               "publicKeys" : [
                 {
@@ -191,10 +193,10 @@
         },
         "storageProfile" : {
           "imageReference": {
-            "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
+            "id": "[resourceId('Microsoft.Compute/images', variables('imageName'))]"
           },
           "osDisk" : {
-            "name": "[concat(variables('vmName'),'_OSDisk')]",
+            "name": "[concat(variables('vmName'),'-osdisk')]",
             "osType" : "Linux",
             "createOption" : "FromImage",
             "managedDisk": {
@@ -204,10 +206,10 @@
           "dataDisks": [
             {
               "lun": 0,
-              "name": "[concat(variables('vmName'),'_DataDisk1')]",
+              "name": "[concat(variables('vmName'),'-datadisk1')]",
               "createOption": "attach",
               "managedDisk": {
-                "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'),'_DataDisk1'))]"
+                "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmName'), '-datadisk1'))]"
               }
             }
           ]
@@ -215,7 +217,7 @@
         "networkProfile" : {
           "networkInterfaces" : [
             {
-              "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmName'), 'nic'))]"
+              "id" : "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
             }
           ]
         },
@@ -226,12 +228,12 @@
     },
     {
       "type" : "Microsoft.Network/networkSecurityGroups",
-      "name" : "[concat(variables('vmName'), 'nsg')]",
+      "name" : "[variables('nsgName')]",
       "tags" : {
         "displayName" : "NetworkSecurityGroup"
       },
-      "apiVersion" : "[variables('apiVersion')]",
-      "location" : "[resourceGroup().location]",
+      "apiVersion" : "2018-06-01",
+      "location" : "[variables('location')]",
       "properties" : {
         "securityRules" : [
           {
@@ -250,6 +252,5 @@
         ]
       }
     }
-  ],
-  "outputs" : {}
+  ]
 }

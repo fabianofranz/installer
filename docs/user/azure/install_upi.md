@@ -158,9 +158,7 @@ $ tree
 │   └── kubeconfig
 ├── bootstrap.ign
 ├── master.ign
-├── master.json
 ├── metadata.json
-├── node.json
 ├── setup-bootstrap-ignition.py
 ├── setup-manifests.py
 └── worker.ign
@@ -292,7 +290,7 @@ Create private DNS records for the internal load balancer:
 export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}intlb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
 
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e false
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e true
 
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int --ttl 60
@@ -313,7 +311,7 @@ az group deployment create -g $RESOURCE_GROUP \
 Create private DNS records for the bootstrap:
 
 ```sh
-export BOOTSTRAP_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name bootstrap-0nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export BOOTSTRAP_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${RESOURCE_GROUP}-bootstrap-nic -n ipconfig1 --query "privateIpAddress" -o tsv`
 
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 --ttl 60
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 -a $BOOTSTRAP_IP
@@ -373,8 +371,8 @@ INFO It is now safe to remove the bootstrap resources
 Once the bootstrapping process is complete you can deallocate and delete bootstrap resources:
 
 ```sh
-az vm stop -g $RESOURCE_GROUP --name bootstrap-0
-az vm deallocate -g $RESOURCE_GROUP --name bootstrap-0 --no-wait
+az vm stop -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
+az vm deallocate -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap --no-wait
 az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${CLUSTER_NAME} --container-name files --name bootstrap.ign
 ```
 

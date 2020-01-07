@@ -47,7 +47,7 @@ with open('manifests/cluster-infrastructure-02-config.yml') as file:
     yamlx = yaml.load(file, Loader=yaml.BaseLoader)
     file.close()
     yamlx['status']['platformStatus']['azure']['resourceGroupName'] = resource_group
-    # yamlx['status']['platformStatus']['azure']['networkResourceGroupName'] = resource_group
+    yamlx['status']['platformStatus']['azure']['networkResourceGroupName'] = resource_group
     yamlx['status']['infrastructureName'] = resource_group
     yamlx['metadata']['creationTimestamp'] = None
     with open('manifests/cluster-infrastructure-02-config.yml', 'w') as outfile:

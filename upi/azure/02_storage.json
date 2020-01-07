@@ -322,9 +322,9 @@
       }
     },
     {
+      "apiVersion" : "2015-06-15",
       "type" : "Microsoft.Storage/storageAccounts",
       "name" : "[variables('nodeStorageName')]",
-      "apiVersion" : "2015-06-15",
       "location" : "[variables('location')]",
       "properties" : {
         "accountType" : "[variables('vmSizesMap')[parameters('nodeVmSize')].storageAccountType]"

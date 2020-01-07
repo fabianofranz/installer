@@ -7,35 +7,34 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+    "masterLoadBalancerName" : "[concat('MasterLb', resourceGroup().name)]",
     "masterPublicIpAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses', resourceGroup().name)]",
     "masterLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
     "masterLbFrontEndConfigId" : "[concat(variables('masterLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
-    "masterLbBackendPoolId" : "[concat(variables('masterLbId'),'/backendAddressPools/loadBalancerBackend')]",
-    "masterLb6443ProbeId" : "[concat(variables('masterLbId'),'/probes/6443Probe')]",
-    "infraPublicIpName" : "[concat(resourceGroup().name,'app')]",
-    "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]",
+    "masterLbBackendPoolId" : "[concat(variables('masterLbId'), '/backendAddressPools/loadBalancerBackend')]",
+    "masterLb6443ProbeId" : "[concat(variables('masterLbId'), '/probes/6443Probe')]",
+    "infraPublicIpName" : "[concat(resourceGroup().name, 'app')]",
+    "infraLoadBalancerName" : "[concat('AppLb', resourceGroup().name)]",
     "infraPublicIpAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('infraPublicIpName'))]",
     "infraLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('infraLoadBalancerName'))]",
     "infraLbFrontEndConfigId" : "[concat(variables('infraLbId'), '/frontendIPConfigurations/AppLoadBalancerFrontEnd')]",
-    "infraLbBackendPoolId" : "[concat(variables('infraLbId'),'/backendAddressPools/AppLoadBalancerBackend')]",
-    "infraLbHttpProbeId" : "[concat(variables('infraLbId'),'/probes/httpProbe')]",
-    "infraLbHttpsProbeId" : "[concat(variables('infraLbId'),'/probes/httpsProbe')]",
-    "apiVersionNetwork" : "2018-12-01",
+    "infraLbBackendPoolId" : "[concat(variables('infraLbId'), '/backendAddressPools/AppLoadBalancerBackend')]",
+    "infraLbHttpProbeId" : "[concat(variables('infraLbId'), '/probes/httpProbe')]",
+    "infraLbHttpsProbeId" : "[concat(variables('infraLbId'), '/probes/httpsProbe')]",
     "intLoadBalancerName" : "[concat(resourceGroup().name, 'intlb')]",
     "intLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName'))]",
-    "intLbBackendPoolId" : "[concat(variables('intLbId'),'/backendAddressPools/masters')]",
-    "intLbProbeId" : "[concat(variables('intLbId'),'/probes/lbprobe')]",
-    "intLbProbeId2" : "[concat(variables('intLbId'),'/probes/probe22623')]",
+    "intLbBackendPoolId" : "[concat(variables('intLbId'), '/backendAddressPools/masters')]",
+    "intLbProbeId" : "[concat(variables('intLbId'), '/probes/lbprobe')]",
+    "intLbProbeId2" : "[concat(variables('intLbId'), '/probes/probe22623')]",
     "intLbFrontEndConfigId" : "[concat(variables('intLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
     "skuName": "Standard"
   },
   "resources" : [
     {
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[variables('infraPublicIpName')]",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftInfraLBPublicIP"
       },
@@ -50,10 +49,10 @@
       }
     },
     {
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[resourceGroup().name]",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftMasterPublicIP"
       },
@@ -68,10 +67,10 @@
       }
     },
     {
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('masterLoadBalancerName')]",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftMasterLB"
       },
@@ -132,10 +131,10 @@
       }
     },
     {
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('infraLoadBalancerName')]",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "appLB"
       },
@@ -220,10 +219,10 @@
       }
     },
     {
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('intLoadBalancerName')]",
       "location" : "[variables('location')]",
-      "apiVersion" : "[variables('apiVersionNetwork')]",
       "tags" : {
         "displayName" : "OpenShiftIntLB"
       },
