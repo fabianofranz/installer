@@ -7,21 +7,22 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb', resourceGroup().name)]",
-    "masterPublicIpAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses', resourceGroup().name)]",
+    "masterPublicIpAddressName" : "[concat(resourceGroup().name, '-master-pip')]",
+    "masterPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('masterPublicIpAddressName'))]",
+    "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
     "masterLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
     "masterLbFrontEndConfigId" : "[concat(variables('masterLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
     "masterLbBackendPoolId" : "[concat(variables('masterLbId'), '/backendAddressPools/loadBalancerBackend')]",
     "masterLb6443ProbeId" : "[concat(variables('masterLbId'), '/probes/6443Probe')]",
-    "infraPublicIpName" : "[concat(resourceGroup().name, 'app')]",
-    "infraLoadBalancerName" : "[concat('AppLb', resourceGroup().name)]",
-    "infraPublicIpAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('infraPublicIpName'))]",
+    "infraPublicIpAddressName" : "[concat(resourceGroup().name, '-infra-pip')]",
+    "infraPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('infraPublicIpAddressName'))]",
+    "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
     "infraLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('infraLoadBalancerName'))]",
     "infraLbFrontEndConfigId" : "[concat(variables('infraLbId'), '/frontendIPConfigurations/AppLoadBalancerFrontEnd')]",
     "infraLbBackendPoolId" : "[concat(variables('infraLbId'), '/backendAddressPools/AppLoadBalancerBackend')]",
     "infraLbHttpProbeId" : "[concat(variables('infraLbId'), '/probes/httpProbe')]",
     "infraLbHttpsProbeId" : "[concat(variables('infraLbId'), '/probes/httpsProbe')]",
-    "intLoadBalancerName" : "[concat(resourceGroup().name, 'intlb')]",
+    "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "intLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName'))]",
     "intLbBackendPoolId" : "[concat(variables('intLbId'), '/backendAddressPools/masters')]",
     "intLbProbeId" : "[concat(variables('intLbId'), '/probes/lbprobe')]",
@@ -33,7 +34,7 @@
     {
       "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
-      "name" : "[variables('infraPublicIpName')]",
+      "name" : "[variables('infraPublicIpAddressName')]",
       "location" : "[variables('location')]",
       "tags" : {
         "displayName" : "OpenShiftInfraLBPublicIP"
@@ -44,14 +45,14 @@
       "properties" : {
         "publicIPAllocationMethod" : "Static",
         "dnsSettings" : {
-          "domainNameLabel" : "[variables('infraPublicIpName')]"
+          "domainNameLabel" : "[variables('infraPublicIpAddressName')]"
         }
       }
     },
     {
       "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
-      "name" : "[resourceGroup().name]",
+      "name" : "[variables('masterPublicIpAddressName')]",
       "location" : "[variables('location')]",
       "tags" : {
         "displayName" : "OpenShiftMasterPublicIP"
@@ -62,7 +63,7 @@
       "properties" : {
         "publicIPAllocationMethod" : "Static",
         "dnsSettings" : {
-          "domainNameLabel" : "[resourceGroup().name]"
+          "domainNameLabel" : "[variables('masterPublicIpAddressName')]"
         }
       }
     },
@@ -78,7 +79,7 @@
         "name": "[variables('skuName')]"
       },
       "dependsOn" : [
-        "[concat('Microsoft.Network/publicIPAddresses/', resourceGroup().name)]"
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('masterPublicIpAddressName'))]"
       ],
       "properties" : {
         "frontendIPConfigurations" : [
@@ -142,7 +143,7 @@
         "name": "[variables('skuName')]"
       },
       "dependsOn" : [
-        "[concat('Microsoft.Network/publicIPAddresses/', variables('infraPublicIpName'))]"
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('infraPublicIpAddressName'))]"
       ],
       "properties" : {
         "frontendIPConfigurations" : [

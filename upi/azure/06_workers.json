@@ -106,13 +106,13 @@
     "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
     "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
-    "infraLoadBalancerName" : "[concat('AppLb',resourceGroup().name)]",
+    "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "copy" : [
       {
         "name" : "vmNames",
         "count" :  "[parameters('numberOfNodes')]",
-        "input" : "[concat('node',padLeft(copyIndex('vmNames', 1), 2, '0'))]"
+        "input" : "[concat(resourceGroup().name, '-worker-', variables('location'), '-', padLeft(copyIndex('vmNames', 1), 2, '0'))]"
       }
     ]
   },
@@ -149,7 +149,7 @@
             {
               "apiVersion" : "2018-06-01",
               "type" : "Microsoft.Network/networkInterfaces",
-              "name" : "[concat(variables('vmNames')[copyIndex()], 'nic')]",
+              "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
               "location" : "[variables('location')]",
               "tags" : {
                 "displayName" : "NetworkInterface"
@@ -182,7 +182,7 @@
                 "displayName" : "VirtualMachine"
               },
               "dependsOn" : [
-                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], 'nic'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]",
                 "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '-datadisk1'))]"
               ],
               "properties" : {
@@ -231,7 +231,7 @@
                 "networkProfile" : {
                   "networkInterfaces" : [
                     {
-                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], 'nic'))]"
+                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]"
                     }
                   ]
                 },

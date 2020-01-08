@@ -97,11 +97,12 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb', resourceGroup().name)]",
+    "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "masterAvailabilitySetID" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]",
+    "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
-    "useridname" : "[concat(resourceGroup().name, '_userid')]",
+    "identityName" : "[concat(resourceGroup().name, '-identity')]",
     "vmName" : "[concat(resourceGroup().name, '-bootstrap')]",
     "nicName" : "[concat(variables('vmName'), '-nic')]",
     "nsgName" : "[concat(variables('vmName'), '-nsg')]",
@@ -145,7 +146,7 @@
                   "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
                 },
                 {
-                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name, 'intlb', '/backendAddressPools/masters')]"
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('intLoadBalancerName'), '/backendAddressPools/masters')]"
                 }
               ]
             }
@@ -164,7 +165,7 @@
       "identity" : {
         "type" : "userAssigned",
         "userAssignedIdentities" : {
-          "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('useridname'))]" : {}
+          "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('identityName'))]" : {}
         }
       },
       "dependsOn" : [

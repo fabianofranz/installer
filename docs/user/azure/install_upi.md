@@ -76,7 +76,10 @@ which will be used in the subsequent steps.
 export RESOURCE_GROUP=$CLUSTER_NAME
 
 az group create --name $RESOURCE_GROUP --location $AZURE_REGION
-az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}_userid
+az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
+export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
+export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
+az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
 ```
 
 ### Create manifests
@@ -182,8 +185,8 @@ openshift-vw4j5
 Create a storage account and export its key as an environment variable.
 
 ```sh
-az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name sa${CLUSTER_NAME} --kind Storage --sku Standard_LRS
-export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name sa${CLUSTER_NAME} --query "[0].value" -o tsv`
+az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${CLUSTER_NAME}sa --kind Storage --sku Standard_LRS
+export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name ${CLUSTER_NAME}sa --query "[0].value" -o tsv`
 ```
 
 ### Copy the cluster image
@@ -199,8 +202,8 @@ export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/ma
 Create a blob storage container and copy the image:
 
 ```sh
-az storage container create --name vhd --account-name sa${CLUSTER_NAME}
-az storage blob copy start --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
+az storage container create --name vhd --account-name ${CLUSTER_NAME}sa
+az storage blob copy start --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
 ```
 
 To track the progress, you can use:
@@ -209,14 +212,14 @@ To track the progress, you can use:
 status="unknown"
 while [ "$status" != "success" ]
 do
-    status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
+    status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
 done
 ```
 
 Store the URL of the copied image for later use:
 
 ```sh
-export VHD_BLOB_URL=`az storage blob url --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
+export VHD_BLOB_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
 ```
 
 ### Upload the ignition file
@@ -224,9 +227,9 @@ export VHD_BLOB_URL=`az storage blob url --account-name sa${CLUSTER_NAME} --acco
 Create a blob storage container and upload the bootstrap.ign file:
 
 ```sh
-az storage container create --name files --account-name sa${CLUSTER_NAME} --public-access blob
-az storage blob upload --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
-export BOOTSTRAP_URL=`az storage blob url --account-name sa${CLUSTER_NAME} --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
+az storage container create --name files --account-name ${CLUSTER_NAME}sa --public-access blob
+az storage blob upload --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
+export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
 ```
 
 ## Deployment
@@ -239,7 +242,6 @@ next steps we're going to deploy each one of them in order, providing the expect
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 01_${CLUSTER_NAME} \
   --template-file "01_vpc.json"
 ```
 
@@ -247,33 +249,24 @@ az group deployment create -g $RESOURCE_GROUP \
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 02_${CLUSTER_NAME} \
   --template-file "02_storage.json" \
   --parameters vhdBlobURL="${VHD_BLOB_URL}"
 ```
 
 ### Deploy the load balancers
 
-Create the public IP addresses:
-
-```sh
-az network public-ip create -g $RESOURCE_GROUP -n $CLUSTER_NAME --allocation-method static --sku Standard
-az network public-ip create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}app --allocation-method static --sku Standard
-```
-
-Deploy them:
+Deploy the load balancers and public IP addresses:
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 03_${CLUSTER_NAME} \
   --template-file "03_infra.json"
 ```
 
 Create DNS records for the public load balancer:
 
 ```sh
-export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}'] | [0].ipAddress" -o tsv`
-export PUBLIC_IP_APPS=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}app'] | [0].ipAddress" -o tsv`
+export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-master-pip'] | [0].ipAddress" -o tsv`
+export PUBLIC_IP_APPS=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-infra-pip'] | [0].ipAddress" -o tsv`
 
 az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 
@@ -287,7 +280,7 @@ az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${B
 Create private DNS records for the internal load balancer:
 
 ```sh
-export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}intlb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
+export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
 
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e true
@@ -302,7 +295,6 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 04_${CLUSTER_NAME} \
   --template-file "04_bootstrap.json" \
   --parameters bootstrapIgnition="`python3 setup-bootstrap-ignition.py $BOOTSTRAP_URL`" \
   --parameters sshKeyData="`echo $SSH_KEY | xargs`"
@@ -324,7 +316,6 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 05_${CLUSTER_NAME} \
   --template-file "05_masters.json" \
   --parameters masterIgnition="`cat master.ign | base64`" \
   --parameters sshKeyData="`echo $SSH_KEY | xargs`"
@@ -333,9 +324,9 @@ az group deployment create -g $RESOURCE_GROUP \
 Create private DNS records for the control plane:
 
 ```sh
-export MASTER0_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master01nic -n ipconfig1 --query "privateIpAddress" -o tsv`
-export MASTER1_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master02nic -n ipconfig1 --query "privateIpAddress" -o tsv`
-export MASTER2_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name master03nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export MASTER0_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${RESOURCE_GROUP}-master-01-nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export MASTER1_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${RESOURCE_GROUP}-master-02-nic -n ipconfig1 --query "privateIpAddress" -o tsv`
+export MASTER2_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${RESOURCE_GROUP}-master-03-nic -n ipconfig1 --query "privateIpAddress" -o tsv`
 
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 --ttl 60
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 --ttl 60
@@ -373,7 +364,7 @@ Once the bootstrapping process is complete you can deallocate and delete bootstr
 ```sh
 az vm stop -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
 az vm deallocate -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap --no-wait
-az storage blob delete --account-key $ACCOUNT_KEY --account-name sa${CLUSTER_NAME} --container-name files --name bootstrap.ign
+az storage blob delete --account-key $ACCOUNT_KEY --account-name ${CLUSTER_NAME}sa --container-name files --name bootstrap.ign
 ```
 
 ### Access the OpenShift API
@@ -392,7 +383,6 @@ oc get clusteroperator
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --name 06_${CLUSTER_NAME} \
   --template-file "06_workers.json" \
   --parameters workerIgnition="`cat worker.ign | base64`" \
   --parameters sshKeyData="`echo $SSH_KEY | xargs`"

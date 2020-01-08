@@ -87,7 +87,7 @@
   "variables" : {
     "location" : "[resourceGroup().location]",
     "imageName" : "[concat(resourceGroup().name, '-image')]",
-    "nodeStorageName" : "[concat('sa', resourceGroup().name)]",
+    "nodeStorageName" : "[concat(resourceGroup().name, 'sa')]",
     "vmSizesMap" : {
       "Standard_A2" : {
         "storageAccountType" : "Standard_LRS"

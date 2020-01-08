@@ -105,15 +105,16 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat('MasterLb',resourceGroup().name)]",
+    "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
+    "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
-    "useridname" : "[concat(resourceGroup().name,'_userid')]",
+    "identityName" : "[concat(resourceGroup().name,'-identity')]",
     "copy" : [
       {
         "name" : "vmNames",
         "count" :  "[parameters('numberOfMasters')]",
-        "input" : "[concat('master', padLeft(copyIndex('vmNames', 1), 2, '0'))]"
+        "input" : "[concat(resourceGroup().name, '-master-', padLeft(copyIndex('vmNames', 1), 2, '0'))]"
       }
     ]
   },
@@ -150,10 +151,10 @@
             {
               "apiVersion" : "2018-06-01",
               "type" : "Microsoft.Network/networkInterfaces",
-              "name" : "[concat(variables('vmNames')[copyIndex()], 'nic')]",
+              "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
               "location" : "[variables('location')]",
               "dependsOn" : [
-                "[concat('Microsoft.Network/networkSecurityGroups/', concat(variables('vmNames')[copyIndex()], 'nsg'))]"
+                "[concat('Microsoft.Network/networkSecurityGroups/', concat(variables('vmNames')[copyIndex()], '-nsg'))]"
               ],
               "properties" : {
                 "ipConfigurations" : [
@@ -169,14 +170,14 @@
                           "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
                         },
                         {
-                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', resourceGroup().name,'intlb', '/backendAddressPools/masters')]"
+                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('intLoadBalancerName'), '/backendAddressPools/masters')]"
                         }
                       ]
                     }
                   }
                 ],
                 "networkSecurityGroup" : {
-                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmNames')[copyIndex()], 'nsg'))]"
+                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmNames')[copyIndex()], '-nsg'))]"
                 }
               }
             },
@@ -188,11 +189,11 @@
               "identity" : {
                 "type" : "userAssigned",
                 "userAssignedIdentities" : {
-                  "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/',variables('useridname'))]" : {}
+                  "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('identityName'))]" : {}
                 }
               },
               "dependsOn" : [
-                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], 'nic'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]",
                 "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '-datadisk1'))]"
               ],
               "properties" : {
@@ -241,7 +242,7 @@
                 "networkProfile" : {
                   "networkInterfaces" : [
                     {
-                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], 'nic'))]"
+                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]"
                     }
                   ]
                 },
@@ -252,7 +253,7 @@
             },
             {
               "type" : "Microsoft.Network/networkSecurityGroups",
-              "name" : "[concat(variables('vmNames')[copyIndex()], 'nsg')]",
+              "name" : "[concat(variables('vmNames')[copyIndex()], '-nsg')]",
               "tags" : {
                 "displayName" : "NetworkSecurityGroup"
               },
