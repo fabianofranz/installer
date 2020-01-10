@@ -102,10 +102,10 @@
     "masterAvailabilitySetID" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]",
     "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+    "controlPlaneNsgName" : "[concat(resourceGroup().name, '-controlplane-nsg')]",
     "identityName" : "[concat(resourceGroup().name, '-identity')]",
     "vmName" : "[concat(resourceGroup().name, '-bootstrap')]",
     "nicName" : "[concat(variables('vmName'), '-nic')]",
-    "nsgName" : "[concat(variables('vmName'), '-nsg')]",
     "imageName" : "[concat(resourceGroup().name, '-image')]"
   },
   "resources" : [
@@ -129,9 +129,6 @@
       "type" : "Microsoft.Network/networkInterfaces",
       "name" : "[variables('nicName')]",
       "location" : "[variables('location')]",
-      "dependsOn" : [
-        "[concat('Microsoft.Network/networkSecurityGroups/', variables('nsgName'))]"
-      ],
       "properties" : {
         "ipConfigurations" : [
           {
@@ -153,7 +150,7 @@
           }
         ],
         "networkSecurityGroup" : {
-          "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+          "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('controlPlaneNsgName'))]"
         }
       }
     },
@@ -225,32 +222,6 @@
         "availabilitySet" : {
           "id" : "[variables('masterAvailabilitySetID')]"
         }
-      }
-    },
-    {
-      "type" : "Microsoft.Network/networkSecurityGroups",
-      "name" : "[variables('nsgName')]",
-      "tags" : {
-        "displayName" : "NetworkSecurityGroup"
-      },
-      "apiVersion" : "2018-06-01",
-      "location" : "[variables('location')]",
-      "properties" : {
-        "securityRules" : [
-          {
-            "name" : "default-allow-openshift-master",
-            "properties" : {
-              "protocol" : "Tcp",
-              "sourcePortRange" : "*",
-              "destinationPortRange" : "6443",
-              "sourceAddressPrefix" : "*",
-              "destinationAddressPrefix" : "*",
-              "access" : "Allow",
-              "priority" : 2000,
-              "direction" : "Inbound"
-            }
-          }
-        ]
       }
     }
   ]

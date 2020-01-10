@@ -77,9 +77,6 @@ export RESOURCE_GROUP=$CLUSTER_NAME
 
 az group create --name $RESOURCE_GROUP --location $AZURE_REGION
 az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
-export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
-export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
-az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
 ```
 
 ### Create manifests
@@ -382,6 +379,10 @@ oc get clusteroperator
 ### Deploy the workers
 
 ```sh
+export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
+export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
+az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
+
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
   --parameters workerIgnition="`cat worker.ign | base64`" \

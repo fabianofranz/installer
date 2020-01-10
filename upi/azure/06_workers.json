@@ -108,6 +108,7 @@
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
     "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+    "nodeNsgName" : "[concat(resourceGroup().name, '-node-nsg')]",
     "copy" : [
       {
         "name" : "vmNames",
@@ -170,7 +171,10 @@
                       ]
                     }
                   }
-                ]
+                ],
+                "networkSecurityGroup" : {
+                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nodeNsgName'))]"
+                }
               }
             },
             {
