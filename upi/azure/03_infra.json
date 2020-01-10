@@ -10,47 +10,18 @@
     "masterPublicIpAddressName" : "[concat(resourceGroup().name, '-master-pip')]",
     "masterPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('masterPublicIpAddressName'))]",
     "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
-    "masterLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
-    "masterLbFrontEndConfigId" : "[concat(variables('masterLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
-    "masterLbBackendPoolId" : "[concat(variables('masterLbId'), '/backendAddressPools/loadBalancerBackend')]",
-    "masterLb6443ProbeId" : "[concat(variables('masterLbId'), '/probes/6443Probe')]",
+    "masterLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
     "infraPublicIpAddressName" : "[concat(resourceGroup().name, '-infra-pip')]",
     "infraPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('infraPublicIpAddressName'))]",
     "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
-    "infraLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('infraLoadBalancerName'))]",
-    "infraLbFrontEndConfigId" : "[concat(variables('infraLbId'), '/frontendIPConfigurations/AppLoadBalancerFrontEnd')]",
-    "infraLbBackendPoolId" : "[concat(variables('infraLbId'), '/backendAddressPools/AppLoadBalancerBackend')]",
-    "infraLbHttpProbeId" : "[concat(variables('infraLbId'), '/probes/httpProbe')]",
-    "infraLbHttpsProbeId" : "[concat(variables('infraLbId'), '/probes/httpsProbe')]",
-    "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
-    "intLbId" : "[resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName'))]",
-    "intLbBackendPoolId" : "[concat(variables('intLbId'), '/backendAddressPools/masters')]",
-    "intLbProbeId" : "[concat(variables('intLbId'), '/probes/lbprobe')]",
-    "intLbProbeId2" : "[concat(variables('intLbId'), '/probes/probe22623')]",
-    "intLbFrontEndConfigId" : "[concat(variables('intLbId'), '/frontendIPConfigurations/loadBalancerFrontEnd')]",
+    "infraLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('infraLoadBalancerName'))]",
+    "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
+    "internalLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('internalLoadBalancerName'))]",
     "skuName": "Standard"
   },
   "resources" : [
     {
-      "apiVersion" : "2018-12-01",
-      "type" : "Microsoft.Network/publicIPAddresses",
-      "name" : "[variables('infraPublicIpAddressName')]",
-      "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "OpenShiftInfraLBPublicIP"
-      },
-      "sku": {
-        "name": "[variables('skuName')]"
-      },
-      "properties" : {
-        "publicIPAllocationMethod" : "Static",
-        "dnsSettings" : {
-          "domainNameLabel" : "[variables('infraPublicIpAddressName')]"
-        }
-      }
-    },
-    {
-      "apiVersion" : "2018-12-01",
+      "apiVersion" : "2019-09-01",
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[variables('masterPublicIpAddressName')]",
       "location" : "[variables('location')]",
@@ -68,7 +39,25 @@
       }
     },
     {
-      "apiVersion" : "2018-12-01",
+      "apiVersion" : "2019-09-01",
+      "type" : "Microsoft.Network/publicIPAddresses",
+      "name" : "[variables('infraPublicIpAddressName')]",
+      "location" : "[variables('location')]",
+      "tags" : {
+        "displayName" : "OpenShiftInfraLBPublicIP"
+      },
+      "sku": {
+        "name": "[variables('skuName')]"
+      },
+      "properties" : {
+        "publicIPAllocationMethod" : "Static",
+        "dnsSettings" : {
+          "domainNameLabel" : "[variables('infraPublicIpAddressName')]"
+        }
+      }
+    },
+    {
+      "apiVersion" : "2019-09-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('masterLoadBalancerName')]",
       "location" : "[variables('location')]",
@@ -84,28 +73,39 @@
       "properties" : {
         "frontendIPConfigurations" : [
           {
-            "name" : "LoadBalancerFrontEnd",
+            "name" : "master-lb-ip",
             "properties" : {
               "publicIPAddress" : {
-                "id" : "[variables('masterPublicIpAddressId')]"
+                "id" : "[variables('masterPublicIpAddressID')]"
               }
             }
           }
         ],
         "backendAddressPools" : [
           {
-            "name" : "loadBalancerBackEnd"
+            "name" : "master-lb-backend"
+          }
+        ],
+        "probes" : [
+          {
+            "name" : "master-lb-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 6443,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
+            }
           }
         ],
         "loadBalancingRules" : [
           {
-            "name" : "OpenShiftAdminConsole",
+            "name" : "master-lb-rules",
             "properties" : {
               "frontendIPConfiguration" : {
-                "id" : "[variables('masterLbFrontEndConfigId')]"
+                "id" :"[concat(variables('masterLoadBalancerID'), '/frontendIPConfigurations/master-lb-ip')]"
               },
               "backendAddressPool" : {
-                "id" : "[variables('masterLbBackendPoolId')]"
+                "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/master-lb-backend')]"
               },
               "protocol" : "Tcp",
               "loadDistribution" : "SourceIP",
@@ -113,26 +113,15 @@
               "frontendPort" : 6443,
               "backendPort" : 6443,
               "probe" : {
-                "id" : "[variables('masterLb6443ProbeId')]"
+                "id" : "[concat(variables('masterLoadBalancerID'), '/probes/master-lb-probe')]"
               }
-            }
-          }
-        ],
-        "probes" : [
-          {
-            "name" : "6443Probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 6443,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
             }
           }
         ]
       }
     },
     {
-      "apiVersion" : "2018-12-01",
+      "apiVersion" : "2019-09-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('infraLoadBalancerName')]",
       "location" : "[variables('location')]",
@@ -148,58 +137,22 @@
       "properties" : {
         "frontendIPConfigurations" : [
           {
-            "name" : "AppLoadBalancerFrontEnd",
+            "name" : "infra-lb-ip",
             "properties" : {
               "publicIPAddress" : {
-                "id" : "[variables('infraPublicIpAddressId')]"
+                "id" : "[variables('infraPublicIpAddressID')]"
               }
             }
           }
         ],
         "backendAddressPools" : [
           {
-            "name" : "AppLoadBalancerBackEnd"
-          }
-        ],
-        "loadBalancingRules" : [
-          {
-            "name" : "OpenShiftRouterHTTP",
-            "properties" : {
-              "frontendIPConfiguration" : {
-                "id" : "[variables('infraLbFrontEndConfigId')]"
-              },
-              "backendAddressPool" : {
-                "id" : "[variables('infraLbBackendPoolId')]"
-              },
-              "protocol" : "Tcp",
-              "frontendPort" : 80,
-              "backendPort" : 80,
-              "probe" : {
-                "id" : "[variables('infraLbHttpProbeId')]"
-              }
-            }
-          },
-          {
-            "name" : "OpenShiftRouterHTTPS",
-            "properties" : {
-              "frontendIPConfiguration" : {
-                "id" : "[variables('infraLbFrontEndConfigId')]"
-              },
-              "backendAddressPool" : {
-                "id" : "[variables('infraLbBackendPoolId')]"
-              },
-              "protocol" : "Tcp",
-              "frontendPort" : 443,
-              "backendPort" : 443,
-              "probe" : {
-                "id" : "[variables('infraLbHttpsProbeId')]"
-              }
-            }
+            "name" : "infra-lb-backend"
           }
         ],
         "probes" : [
           {
-            "name" : "httpProbe",
+            "name" : "infra-lb-http-probe",
             "properties" : {
               "protocol" : "Tcp",
               "port" : 80,
@@ -208,7 +161,7 @@
             }
           },
           {
-            "name" : "httpsProbe",
+            "name" : "infra-lb-https-probe",
             "properties" : {
               "protocol" : "Tcp",
               "port" : 443,
@@ -216,13 +169,49 @@
               "numberOfProbes" : 2
             }
           }
+        ],
+        "loadBalancingRules" : [
+          {
+            "name" : "OpenShiftRouterHTTP",
+            "properties" : {
+              "frontendIPConfiguration" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/frontendIPConfigurations/infra-lb-ip')]"
+              },
+              "backendAddressPool" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/backendAddressPools/infra-lb-backend')]"
+              },
+              "protocol" : "Tcp",
+              "frontendPort" : 80,
+              "backendPort" : 80,
+              "probe" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/probes/infra-lb-http-probe')]"
+              }
+            }
+          },
+          {
+            "name" : "OpenShiftRouterHTTPS",
+            "properties" : {
+              "frontendIPConfiguration" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/frontendIPConfigurations/infra-lb-ip')]"
+              },
+              "backendAddressPool" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/backendAddressPools/infra-lb-backend')]"
+              },
+              "protocol" : "Tcp",
+              "frontendPort" : 443,
+              "backendPort" : 443,
+              "probe" : {
+                "id" : "[concat(variables('infraLoadBalancerID'), '/probes/infra-lb-https-probe')]"
+              }
+            }
+          }
         ]
       }
     },
     {
-      "apiVersion" : "2018-12-01",
+      "apiVersion" : "2019-09-01",
       "type" : "Microsoft.Network/loadBalancers",
-      "name" : "[variables('intLoadBalancerName')]",
+      "name" : "[variables('internalLoadBalancerName')]",
       "location" : "[variables('location')]",
       "tags" : {
         "displayName" : "OpenShiftIntLB"
@@ -233,7 +222,7 @@
       "properties" : {
         "frontendIPConfigurations" : [
           {
-            "name" : "LoadBalancerFrontEnd",
+            "name" : "internal-lb-ip",
             "properties" : {
               "privateIPAllocationMethod" : "Dynamic",
               "subnet" : {
@@ -245,7 +234,27 @@
         ],
         "backendAddressPools" : [
           {
-            "name" : "masters"
+            "name" : "internal-lb-backend"
+          }
+        ],
+        "probes" : [
+          {
+            "name" : "internal-lb-6443-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 6443,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
+            }
+          },
+          {
+            "name" : "internal-lb-22623-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 22623,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
+            }
           }
         ],
         "loadBalancingRules" : [
@@ -253,20 +262,20 @@
             "name" : "lbrint",
             "properties" : {
               "frontendIPConfiguration" : {
-                "id" : "[variables('intLbFrontEndConfigId')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/frontendIPConfigurations/internal-lb-ip')]"
               },
               "frontendPort" : 6443,
               "backendPort" : 6443,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 4,
+              "idleTimeoutInMinutes" : 30,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
               "backendAddressPool" : {
-                "id" : "[variables('intLbBackendPoolId')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/backendAddressPools/internal-lb-backend')]"
               },
               "probe" : {
-                "id" : "[variables('intLbProbeId')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/probes/internal-lb-6443-probe')]"
               }
             }
           },
@@ -274,41 +283,21 @@
             "name" : "lb22623",
             "properties" : {
               "frontendIPConfiguration" : {
-                "id" : "[concat(resourceId('Microsoft.Network/loadBalancers', variables('intLoadBalancerName')), '/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/frontendIPConfigurations/internal-lb-ip')]"
               },
               "frontendPort" : 22623,
               "backendPort" : 22623,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 4,
+              "idleTimeoutInMinutes" : 30,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
               "backendAddressPool" : {
-                "id" : "[variables('intLbBackendPoolId')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/backendAddressPools/internal-lb-backend')]"
               },
               "probe" : {
-                "id" : "[variables('intLbProbeId2')]"
+                "id" : "[concat(variables('internalLoadBalancerID'), '/probes/internal-lb-22623-probe')]"
               }
-            }
-          }
-        ],
-        "probes" : [
-          {
-            "name" : "lbprobe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 6443,
-              "intervalInSeconds" : 15,
-              "numberOfProbes" : 2
-            }
-          },
-          {
-            "name" : "probe22623",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 22623,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
             }
           }
         ]

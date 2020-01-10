@@ -277,7 +277,7 @@ az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${B
 Create private DNS records for the internal load balancer:
 
 ```sh
-export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
+export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n internal-lb-ip --query "privateIpAddress" -o tsv`
 
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e true

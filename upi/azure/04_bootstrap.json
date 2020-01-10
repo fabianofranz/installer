@@ -100,7 +100,7 @@
     "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "masterAvailabilitySetID" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]",
-    "intLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
+    "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "controlPlaneNsgName" : "[concat(resourceGroup().name, '-controlplane-nsg')]",
     "identityName" : "[concat(resourceGroup().name, '-identity')]",
@@ -140,10 +140,10 @@
               },
               "loadBalancerBackendAddressPools" : [
                 {
-                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/loadBalancerBackEnd')]"
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/master-lb-backend')]"
                 },
                 {
-                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('intLoadBalancerName'), '/backendAddressPools/masters')]"
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('internalLoadBalancerName'), '/backendAddressPools/internal-lb-backend')]"
                 }
               ]
             }

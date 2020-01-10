@@ -27,28 +27,28 @@ python3 setup-manifests.py $RESOURCE_GROUP
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-# cat > manifests/ingress-controller-02-default.yaml <<EOF
-# apiVersion: operator.openshift.io/v1
-# kind: IngressController
-# metadata:
-#   finalizers:
-#   - ingresscontroller.operator.openshift.io/finalizer-ingresscontroller
-#   name: default
-#   namespace: openshift-ingress-operator
-# spec:
-#   endpointPublishingStrategy:
-#     type: HostNetwork
-#   replicas: 3
-# EOF
+cat > manifests/ingress-controller-02-default.yaml <<EOF
+apiVersion: operator.openshift.io/v1
+kind: IngressController
+metadata:
+  finalizers:
+  - ingresscontroller.operator.openshift.io/finalizer-ingresscontroller
+  name: default
+  namespace: openshift-ingress-operator
+spec:
+  endpointPublishingStrategy:
+    type: HostNetwork
+  replicas: 3
+EOF
 
 openshift-install create ignition-configs
 
 az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${CLUSTER_NAME}sa --kind Storage --sku Standard_LRS
 export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name ${CLUSTER_NAME}sa --query "[0].value" -o tsv`
 
-export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-42.80.20191002.0.vhd"
+# export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-42.80.20191002.0.vhd"
 # export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.201912131630.0-azure.x86_64.vhd"
-# export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
+export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
 
 az storage container create --name vhd --account-name ${CLUSTER_NAME}sa
 az storage blob copy start --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
@@ -67,7 +67,7 @@ az group deployment create -g $RESOURCE_GROUP \
   --template-file "01_vpc.json"
 
 # TODO
-az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN} --resolution-vnets "${RESOURCE_GROUP}-vnet" --zone-type Private
+# az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN} --resolution-vnets "${RESOURCE_GROUP}-vnet" --zone-type Private
 
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "02_storage.json" \
@@ -85,7 +85,7 @@ echo "Public IP Apps: ${PUBLIC_IP_APPS}"
 
 read -p "Create the public DNS entries then press [ENTER] to continue..."
 
-export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n LoadBalancerFrontEnd --query "privateIpAddress" -o tsv`
+export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n internal-lb-ip --query "privateIpAddress" -o tsv`
 
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e true
@@ -126,16 +126,16 @@ export MASTER2_IP=`az network nic ip-config show -g $RESOURCE_GROUP --nic-name $
 # az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a $MASTER1_IP
 # az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a $MASTER2_IP
 
+# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
+# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
+
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 --ttl 60
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 --ttl 60
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 --ttl 60
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 -a $MASTER0_IP
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a $MASTER1_IP
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a $MASTER2_IP
-
-# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
-# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
-# az network dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
