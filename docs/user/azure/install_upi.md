@@ -22,7 +22,7 @@ example.
 The machines will be started manually. Therefore, it is required to generate
 the bootstrap and machine ignition configs and store them for later steps.
 
-### Create install config
+### Create an install config
 
 Create an install configuration as for [the usual approach](install.md#create-configuration):
 
@@ -41,9 +41,21 @@ INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Pull Secret [? for help]
 ```
 
-<!-- #### Empty the compute pool
+#### Extract data from install config
 
-We'll be providing the control-plane and compute machines ourselves, so edit the resulting `install-config.yaml` to set `replicas` to 0 for the `compute` pool:
+Some data from the install configuration file will be used on later steps. Export them as environment variables with:
+
+```sh
+export CLUSTER_NAME=`yq -r .metadata.name install-config.yaml`
+export AZURE_REGION=`yq -r .platform.azure.region install-config.yaml`
+export SSH_KEY=`yq -r .sshKey install-config.yaml | xargs`
+export BASE_DOMAIN=`yq -r .baseDomain install-config.yaml`
+export RESOURCE_GROUP=$CLUSTER_NAME
+```
+
+### Empty the compute pool (optional)
+
+If you do not want the cluster to provision compute machines, edit the resulting `install-config.yaml` to set `replicas` to 0 for the `compute` pool.
 
 ```sh
 python -c '
@@ -52,31 +64,6 @@ path = "install-config.yaml";
 data = yaml.full_load(open(path));
 data["compute"][0]["replicas"] = 0;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-```
- -->
-#### Extract data from install config
-
-Some data from the install configuration will be used on later steps. Export them as environment variables with:
-
-```sh
-export CLUSTER_NAME=`yq -r .metadata.name install-config.yaml`
-export AZURE_REGION=`yq -r .platform.azure.region install-config.yaml`
-export SSH_KEY=`yq -r .sshKey install-config.yaml`
-export BASE_DOMAIN=`yq -r .baseDomain install-config.yaml`
-```
-
-### Create The Resource Group
-
-All resources created as part of this Azure deployment will exist as part of a resource group. Use the commands
-below to create it in the selected Azure region. In this example we're going to use the cluster name as the unique
-resource group name, but feel free to choose any other name and export it in the RESOURCE_GROUP environment variable,
-which will be used in the subsequent steps.
-
-```sh
-export RESOURCE_GROUP=$CLUSTER_NAME
-
-az group create --name $RESOURCE_GROUP --location $AZURE_REGION
-az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
 ```
 
 ### Create manifests
@@ -92,8 +79,8 @@ INFO Consuming "Install Config" from target directory
 #### Update manifests
 
 The manifests need to reflect the resources to be created by the [Azure Resource Manager][azuretemplates] template, e.g. the
-VNet and subnet names, resource group name, and so on. Also, we you don't want [the ingress operator][ingress-operator] to
-create DNS records so we need to remove the `privateZone` and `publicZone` sections from the DNS configuration in manifests.
+resource group name. Also, we you don't want [the ingress operator][ingress-operator] to create DNS records (we're going to
+do it manually) so we need to remove the `privateZone` and `publicZone` sections from the DNS configuration in manifests.
 
 A Python script is provided to help with these changes in manifests. Run it with:
 
@@ -166,7 +153,7 @@ $ tree
 
 ### Infra ID
 
-The OpenShift cluster has been assigned an identifier in the form of `<cluster name>-<random string>`. You do not need this for anything, but it is a good idea to keep it around.
+The OpenShift cluster has been assigned an identifier in the form of `<cluster name>-<random string>`. You do not need this for anything in this example, but it is a good idea to keep it around.
 You can see the various metadata about your future cluster in `metadata.json`.
 
 The Infra ID is under the `infraID` key:
@@ -177,9 +164,22 @@ $ echo $INFRA_ID
 openshift-vw4j5
 ```
 
+### Create The Resource Group
+
+All resources created as part of this Azure deployment will exist as part of a resource group. Use the commands
+below to create it in the selected Azure region. In this example we're going to use the cluster name as the unique
+resource group name, but feel free to choose any other name and export it in the RESOURCE_GROUP environment variable,
+which will be used in the subsequent steps.
+
+```sh
+
+az group create --name $RESOURCE_GROUP --location $AZURE_REGION
+az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
+```
+
 ### Create a Storage Account
 
-Create a storage account and export its key as an environment variable.
+Create a storage account that will be used to store the cluster VHD image and the ignition files. Wxport its key as an environment variable.
 
 ```sh
 az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${CLUSTER_NAME}sa --kind Storage --sku Standard_LRS
@@ -188,7 +188,7 @@ export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-na
 
 ### Copy the cluster image
 
-Given the size of the Red Hat Enterprise Linux CoreOS virtual hard disk, it's not possible to run the required commands
+Given the size of the Red Hat Enterprise Linux CoreOS virtual hard disk (VHD), it's not possible to run the required commands
 with the image stored locally. We must copy and store it in a storage container instead. To do so, first locate the latest RHCOS
 image (or any other version as desired) and export its URL to an environment variable.
 
@@ -196,7 +196,7 @@ image (or any other version as desired) and export its URL to an environment var
 export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
 ```
 
-Create a blob storage container and copy the image:
+Create a blob storage container and copy the image to it:
 
 ```sh
 az storage container create --name vhd --account-name ${CLUSTER_NAME}sa
@@ -209,11 +209,12 @@ To track the progress, you can use:
 status="unknown"
 while [ "$status" != "success" ]
 do
-    status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
+  status=`az storage blob show --container-name vhd --name "rhcos.vhd" --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -o tsv --query properties.copy.status`
+  echo $status
 done
 ```
 
-Store the URL of the copied image for later use:
+Store the blob URL of the copied image for later use:
 
 ```sh
 export VHD_BLOB_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
@@ -226,6 +227,7 @@ Create a blob storage container and upload the bootstrap.ign file:
 ```sh
 az storage container create --name files --account-name ${CLUSTER_NAME}sa --public-access blob
 az storage blob upload --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
+
 export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
 ```
 
@@ -294,7 +296,7 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "04_bootstrap.json" \
   --parameters bootstrapIgnition="`python3 setup-bootstrap-ignition.py $BOOTSTRAP_URL`" \
-  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
+  --parameters sshKeyData="$SSH_KEY"
 ```
 
 Create private DNS records for the bootstrap:
@@ -315,7 +317,7 @@ az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "05_masters.json" \
   --parameters masterIgnition="`cat master.ign | base64`" \
-  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
+  --parameters sshKeyData="$SSH_KEY"
 ```
 
 Create private DNS records for the control plane:
@@ -332,9 +334,9 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a $MASTER1_IP
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a $MASTER2_IP
 
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
 ### Wait for the bootstrap complete
@@ -386,7 +388,7 @@ az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope 
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
   --parameters workerIgnition="`cat worker.ign | base64`" \
-  --parameters sshKeyData="`echo $SSH_KEY | xargs`"
+  --parameters sshKeyData="$SSH_KEY"
 ```
 
 ### Approve the worker CSRs

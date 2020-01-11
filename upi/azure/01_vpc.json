@@ -10,9 +10,7 @@
     "masterSubnetPrefix" : "10.0.0.0/24",
     "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
-    "nodeSubnetPrefix" : "10.0.1.0/24",
-    "controlPlaneNsgName" : "[concat(resourceGroup().name, '-controlplane-nsg')]",
-    "nodeNsgName" : "[concat(resourceGroup().name, '-node-nsg')]"
+    "nodeSubnetPrefix" : "10.0.1.0/24"
   },
   "resources" : [
     {
@@ -23,10 +21,6 @@
       "tags" : {
         "displayName" : "VirtualNetwork"
       },
-      "dependsOn" : [
-        "[concat('Microsoft.Network/networkSecurityGroups/', variables('controlPlaneNsgName'))]",
-        "[concat('Microsoft.Network/networkSecurityGroups/', variables('nodeNsgName'))]"
-      ],
       "properties" : {
         "addressSpace" : {
           "addressPrefixes" : [
@@ -35,21 +29,15 @@
         },
         "subnets" : [
           {
-            "name" : "[variables('masterSubnetName')]",
+            "name" : "[variables('nodeSubnetName')]",
             "properties" : {
-              "addressPrefix" : "[variables('masterSubnetPrefix')]",
-              "networkSecurityGroup": {
-                "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('controlPlaneNsgName'))]"
-              }
+              "addressPrefix" : "[variables('nodeSubnetPrefix')]"
             }
           },
           {
-            "name" : "[variables('nodeSubnetName')]",
+            "name" : "[variables('masterSubnetName')]",
             "properties" : {
-              "addressPrefix" : "[variables('nodeSubnetPrefix')]",
-              "networkSecurityGroup": {
-                "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nodeNsgName'))]"
-              }
+              "addressPrefix" : "[variables('masterSubnetPrefix')]"
             }
           }
         ]
@@ -77,44 +65,6 @@
       },
       "sku": {
         "name" : "Aligned"
-      }
-    },
-    {
-      "type" : "Microsoft.Network/networkSecurityGroups",
-      "name" : "[variables('controlPlaneNsgName')]",
-      "tags" : {
-        "displayName" : "NetworkSecurityGroup"
-      },
-      "apiVersion" : "2018-06-01",
-      "location" : "[variables('location')]",
-      "properties" : {
-        "securityRules" : [
-          {
-            "name" : "default-allow-openshift-master",
-            "properties" : {
-              "protocol" : "Tcp",
-              "sourcePortRange" : "*",
-              "destinationPortRange" : "6443",
-              "sourceAddressPrefix" : "*",
-              "destinationAddressPrefix" : "*",
-              "access" : "Allow",
-              "priority" : 2000,
-              "direction" : "Inbound"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "type" : "Microsoft.Network/networkSecurityGroups",
-      "name" : "[variables('nodeNsgName')]",
-      "tags" : {
-        "displayName" : "NetworkSecurityGroup"
-      },
-      "apiVersion" : "2018-06-01",
-      "location" : "[variables('location')]",
-      "properties" : {
-        "securityRules" : []
       }
     }
   ]

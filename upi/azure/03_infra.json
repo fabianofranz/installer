@@ -21,7 +21,7 @@
   },
   "resources" : [
     {
-      "apiVersion" : "2019-09-01",
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[variables('masterPublicIpAddressName')]",
       "location" : "[variables('location')]",
@@ -39,7 +39,7 @@
       }
     },
     {
-      "apiVersion" : "2019-09-01",
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[variables('infraPublicIpAddressName')]",
       "location" : "[variables('location')]",
@@ -57,7 +57,7 @@
       }
     },
     {
-      "apiVersion" : "2019-09-01",
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('masterLoadBalancerName')]",
       "location" : "[variables('location')]",
@@ -86,17 +86,6 @@
             "name" : "master-lb-backend"
           }
         ],
-        "probes" : [
-          {
-            "name" : "master-lb-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 6443,
-              "intervalInSeconds" : 10,
-              "numberOfProbes" : 3
-            }
-          }
-        ],
         "loadBalancingRules" : [
           {
             "name" : "master-lb-rules",
@@ -117,11 +106,22 @@
               }
             }
           }
+        ],
+        "probes" : [
+          {
+            "name" : "master-lb-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 6443,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
+            }
+          }
         ]
       }
     },
     {
-      "apiVersion" : "2019-09-01",
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('infraLoadBalancerName')]",
       "location" : "[variables('location')]",
@@ -148,26 +148,6 @@
         "backendAddressPools" : [
           {
             "name" : "infra-lb-backend"
-          }
-        ],
-        "probes" : [
-          {
-            "name" : "infra-lb-http-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 80,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
-            }
-          },
-          {
-            "name" : "infra-lb-https-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 443,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
-            }
           }
         ],
         "loadBalancingRules" : [
@@ -205,11 +185,31 @@
               }
             }
           }
+        ],
+        "probes" : [
+          {
+            "name" : "infra-lb-http-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 80,
+              "intervalInSeconds" : 5,
+              "numberOfProbes" : 2
+            }
+          },
+          {
+            "name" : "infra-lb-https-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 443,
+              "intervalInSeconds" : 5,
+              "numberOfProbes" : 2
+            }
+          }
         ]
       }
     },
     {
-      "apiVersion" : "2019-09-01",
+      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('internalLoadBalancerName')]",
       "location" : "[variables('location')]",
@@ -237,26 +237,6 @@
             "name" : "internal-lb-backend"
           }
         ],
-        "probes" : [
-          {
-            "name" : "internal-lb-6443-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 6443,
-              "intervalInSeconds" : 10,
-              "numberOfProbes" : 3
-            }
-          },
-          {
-            "name" : "internal-lb-22623-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 22623,
-              "intervalInSeconds" : 10,
-              "numberOfProbes" : 3
-            }
-          }
-        ],
         "loadBalancingRules" : [
           {
             "name" : "lbrint",
@@ -267,7 +247,7 @@
               "frontendPort" : 6443,
               "backendPort" : 6443,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 30,
+              "idleTimeoutInMinutes" : 4,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
@@ -288,7 +268,7 @@
               "frontendPort" : 22623,
               "backendPort" : 22623,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 30,
+              "idleTimeoutInMinutes" : 4,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
@@ -298,6 +278,26 @@
               "probe" : {
                 "id" : "[concat(variables('internalLoadBalancerID'), '/probes/internal-lb-22623-probe')]"
               }
+            }
+          }
+        ],
+        "probes" : [
+          {
+            "name" : "internal-lb-6443-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 6443,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
+            }
+          },
+          {
+            "name" : "internal-lb-22623-probe",
+            "properties" : {
+              "protocol" : "Tcp",
+              "port" : 22623,
+              "intervalInSeconds" : 10,
+              "numberOfProbes" : 3
             }
           }
         ]
