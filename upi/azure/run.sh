@@ -65,6 +65,10 @@ az storage container create --name files --account-name ${CLUSTER_NAME}sa --publ
 az storage blob upload --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
 export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
 
+export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
+export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
+az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
+
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "01_vpc.json"
 
@@ -154,10 +158,6 @@ az storage blob delete --account-key $ACCOUNT_KEY --account-name ${CLUSTER_NAME}
 export KUBECONFIG="$PWD/auth/kubeconfig"
 oc get nodes
 oc get clusteroperator
-
-export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
-export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
-az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
 
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
