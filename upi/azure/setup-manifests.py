@@ -30,7 +30,7 @@ with open('manifests/cloud-provider-config.yaml') as file:
     config.vnetName = resource_group + "-vnet"
     config.vnetResourceGroup = resource_group
     config.subnetName = resource_group + "-master-subnet"
-    config.securityGroupName = resource_group + "-master-01-nsg"
+    config.securityGroupName = resource_group + "-controlplane-nsg"
     config.routeTableName = ""
     config.azure_resourcegroup = resource_group
     jsondata = json.dumps(dict(**config.toDict()), indent='\t')
