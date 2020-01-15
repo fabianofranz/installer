@@ -76,10 +76,10 @@ INFO Credentials loaded from file "/home/user_id/.azure/osServicePrincipal.json"
 INFO Consuming "Install Config" from target directory
 ```
 
-#### Update manifests
+### Update manifests
 
 The manifests need to reflect the resources to be created by the [Azure Resource Manager][azuretemplates] template, e.g. the
-resource group name. Also, we you don't want [the ingress operator][ingress-operator] to create DNS records (we're going to
+resource group name. Also, we don't want [the ingress operator][ingress-operator] to create DNS records (we're going to
 do it manually) so we need to remove the `privateZone` and `publicZone` sections from the DNS configuration in manifests.
 
 A Python script is provided to help with these changes in manifests. Run it with:
@@ -98,7 +98,32 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 ```
 
-#### Create manifest for the ingress controller
+#### Make control-plane nodes unschedulable (optional)
+
+Currently [emptying the compute pools](#empty-the-compute-pool-optional) makes control-plane nodes schedulable.
+But due to a [Kubernetes limitation][kubernetes-service-load-balancers-exclude-masters], router pods running on control-plane nodes will not be reachable by the ingress load balancer.
+Update the scheduler configuration to keep router pods and other workloads off the control-plane nodes:
+
+```sh
+python -c '
+import yaml;
+path = "manifests/cluster-scheduler-02-config.yml"
+data = yaml.load(open(path));
+data["spec"]["mastersSchedulable"] = False;
+open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+```
+
+#### Ingress endpoint publishing strategy
+
+The Ingress Operator is the component responsible for enabling external access to OpenShift Container Platform cluster services. Changing the ingress endpoint publishing strategy
+allows you to define the behavior of how the ingress controller publishes endpoints to other networks and integrates with other systems. Please refer to the Ingress documentation for more details.
+
+In this example we can choose between either the **AWS LoadBalancerService** (default) or the **HostNetwork** strategy. In the *default* strategy the Ingress Operator creates and
+internally manages a public IP and a public router, however it requires an [Azure identity][azure-identity] with *Contributor* access to the resource group to
+be able to do that. In the *HostNetwork* strategy you create the public IP and load balancer yourself, however it allows greater control, integration with existing resources, and
+removes the need to grant special roles to the Azure identity.
+
+If you'd like to use the *HostNetwork* strategy, create a manifest file with:
 
 ```sh
 cat > manifests/ingress-controller-02-default.yaml <<EOF
@@ -154,7 +179,7 @@ $ tree
 ### Infra ID
 
 The OpenShift cluster has been assigned an identifier in the form of `<cluster name>-<random string>`. You do not need this for anything in this example, but it is a good idea to keep it around.
-You can see the various metadata about your future cluster in `metadata.json`.
+At this point you can see the various metadata about your future cluster in `metadata.json`.
 
 The Infra ID is under the `infraID` key:
 
@@ -166,7 +191,7 @@ openshift-vw4j5
 
 ### Create The Resource Group
 
-All resources created as part of this Azure deployment will exist as part of a resource group. Use the commands
+All resources created in this Azure deployment will exist as part of a [resource group](azure-resource-group). Use the commands
 below to create it in the selected Azure region. In this example we're going to use the cluster name as the unique
 resource group name, but feel free to choose any other name and export it in the RESOURCE_GROUP environment variable,
 which will be used in the subsequent steps.
@@ -177,26 +202,32 @@ az group create --name $RESOURCE_GROUP --location $AZURE_REGION
 az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
 ```
 
-### Create a Storage Account
+### Upload the files to a Storage Account
 
-Create a storage account that will be used to store the cluster VHD image and the ignition files. Wxport its key as an environment variable.
+The deployment steps will read the RHCOS VHD image and the bootstrap ignition config file from a blob. Create a storage account that will be used to store them and export its key as an environment variable.
 
 ```sh
 az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${CLUSTER_NAME}sa --kind Storage --sku Standard_LRS
 export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name ${CLUSTER_NAME}sa --query "[0].value" -o tsv`
 ```
 
-### Copy the cluster image
+#### Copy the cluster image
 
-Given the size of the Red Hat Enterprise Linux CoreOS virtual hard disk (VHD), it's not possible to run the required commands
-with the image stored locally. We must copy and store it in a storage container instead. To do so, first locate the latest RHCOS
-image (or any other version as desired) and export its URL to an environment variable.
+Choose the RHCOS version you'd like to use and export the URL of its Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) to an environment variable. For example, to use the latest 4.2 version
+available at the time of this writing, use:
+
+```sh
+export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.201912131630.0-azure.x86_64.vhd"
+```
+
+If you'd just like to use the latest version available, use:
 
 ```sh
 export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
 ```
 
-Create a blob storage container and copy the image to it:
+Given the size of the VHD, it's not possible to run the required commands with the file stored locally on your machine.
+We must copy and store it in a storage container instead. To do so, first create a blob storage container and then copy the image our environment variable points to:
 
 ```sh
 az storage container create --name vhd --account-name ${CLUSTER_NAME}sa
@@ -214,28 +245,65 @@ do
 done
 ```
 
-Store the blob URL of the copied image for later use:
+Save the blob URL of the copied image for later use:
 
 ```sh
 export VHD_BLOB_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv`
 ```
 
-### Upload the ignition file
+#### Upload the bootstrap ignition
 
-Create a blob storage container and upload the bootstrap.ign file:
+Create a blob storage container and upload the generated bootstrap.ign file:
 
 ```sh
 az storage container create --name files --account-name ${CLUSTER_NAME}sa --public-access blob
 az storage blob upload --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
+```
 
+Save the blob URL of the copied file for later use:
+
+```sh
 export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
+```
+
+### Create the DNS zones
+
+A few DNS records are required for clusters that use user-provisioned infrastructure. Feel free to choose the DNS strategy that fits you best.
+
+In this example we're going to use [Azure's own DNS solution](azure-dns), so we're going to create a new public DNS zone for external (internet) visibility, and
+a private DNS zone for internal cluster resolution. Note that the public zone don't necessarily need to exist in the same resource group of the
+cluster deployment itself and may even already exist in your organization for the desired base domain. If that's the case, you can skip the public DNS
+zone creation step, but make sure the install config generated earlier [reflects that scenario](customization.md#cluster-scoped-properties).
+
+Create the new public DNS zone:
+
+```sh
+az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
+```
+
+Create the private zone and link it to the cluster VNet:
+
+```sh
+az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e false
+```
+
+### Grant access to the identity (optional)
+
+If you chose to use the *default* [Ingress endpoint publishing strategy](#ingress-endpoint-publishing-strategy) instead of the *HostNetwork* one, you'll need to grant the *Contributor*
+role to the Azure identity so that the Ingress Operator can create a public IP. You can do that with:
+
+```sh
+export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
+export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
+az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
 ```
 
 ## Deployment
 
 The key part of this UPI deployment are the [Azure Resource Manager][azuretemplates] templates, which are responsible
 for deploying most resources. They're provided as a few json files named following the "NN_name.json" pattern. In the
-next steps we're going to deploy each one of them in order, providing the expected parameters.
+next steps we're going to deploy each one of them in order, using [az (Azure CLI)][azurecli] and providing the expected parameters.
 
 ### Deploy the VPC
 
@@ -244,7 +312,7 @@ az group deployment create -g $RESOURCE_GROUP \
   --template-file "01_vpc.json"
 ```
 
-### Deploy the storage account
+### Deploy the image
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
@@ -261,28 +329,19 @@ az group deployment create -g $RESOURCE_GROUP \
   --template-file "03_infra.json"
 ```
 
-Create DNS records for the public load balancer:
+Create DNS records for the public load balancer. If your public DNS zone doesn't live in the same resource group, make sure to point this command to the right one.
 
 ```sh
 export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-master-pip'] | [0].ipAddress" -o tsv`
-export PUBLIC_IP_APPS=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-infra-pip'] | [0].ipAddress" -o tsv`
-
-az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 
 az network dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
-az network dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
-
 az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP
-az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_APPS
 ```
 
 Create private DNS records for the internal load balancer:
 
 ```sh
 export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n internal-lb-ip --query "privateIpAddress" -o tsv`
-
-az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e true
 
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api-int --ttl 60
@@ -293,9 +352,11 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 ### Launch the temporary cluster bootstrap
 
 ```sh
+export BOOTSTRAP_IGNITION=`python3 setup-bootstrap-ignition.py $BOOTSTRAP_URL`
+
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "04_bootstrap.json" \
-  --parameters bootstrapIgnition="`python3 setup-bootstrap-ignition.py $BOOTSTRAP_URL`" \
+  --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
   --parameters sshKeyData="$SSH_KEY"
 ```
 
@@ -308,15 +369,17 @@ az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n bootstrap-0 -a $BOOTSTRAP_IP
 
 az network private-dns record-set srv create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp --ttl 60
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 10 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
-### Deploy the masters
+### Launch the permanent control plane
 
 ```sh
+export MASTER_IGNITION=`cat master.ign | base64`
+
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "05_masters.json" \
-  --parameters masterIgnition="`cat master.ign | base64`" \
+  --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_KEY"
 ```
 
@@ -347,11 +410,11 @@ Wait until cluster bootstrapping has completed:
 $ openshift-install wait-for bootstrap-complete --log-level debug
 DEBUG OpenShift Installer v4.n
 DEBUG Built from commit 6b629f0c847887f22c7a95586e49b0e2434161ca
-INFO Waiting up to 30m0s for the Kubernetes API at https://api.basedomain.com:6443...
+INFO Waiting up to 30m0s for the Kubernetes API at https://api.cluster.basedomain.com:6443...
 DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
 DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
 DEBUG Still waiting for the Kubernetes API: the server could not find the requested resource
-DEBUG Still waiting for the Kubernetes API: Get https://api.basedomain.com:6443/version?timeout=32s: dial tcp: connect: connection refused
+DEBUG Still waiting for the Kubernetes API: Get https://api.cluster.basedomain.com:6443/version?timeout=32s: dial tcp: connect: connection refused
 INFO API v1.14.n up
 INFO Waiting up to 30m0s for bootstrapping to complete...
 DEBUG Bootstrap status: complete
@@ -368,7 +431,7 @@ az storage blob delete --account-key $ACCOUNT_KEY --account-name ${CLUSTER_NAME}
 
 ### Access the OpenShift API
 
-You can use the `oc` or `kubectl` commands to talk to the OpenShift API. The admin credentials are in `auth/kubeconfig`. For example:
+You can now use the `oc` or `kubectl` commands to talk to the OpenShift API. The admin credentials are in `auth/kubeconfig`. For example:
 
 ```sh
 export KUBECONFIG="$PWD/auth/kubeconfig"
@@ -376,22 +439,25 @@ oc get nodes
 oc get clusteroperator
 ```
 
-**NOTE**: Only the API will be up at this point. The OpenShift web console will run on the compute nodes.
+Note that only the API will be up at this point. The OpenShift web console will run on the compute nodes.
 
-### Deploy the workers
+### Lanch compute nodes
+
+You may create compute nodes by launching individual instances discretely or by automated processes outside the cluster (e.g. Auto Scaling Groups).
+You can also take advantage of the built in cluster scaling mechanisms and the machine API in OpenShift.
+
+In this example, we'll manually launch three instances via the provided ARM template. Additional instances can be launched by editing the 06_workers.json file.
 
 ```sh
-export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
-export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
-az role assignment create --assignee $PRINCIPAL_ID --role 'Contributor' --scope $RESOURCE_GROUP_ID
+export WORKER_IGNITION=`cat worker.ign | base64`
 
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
-  --parameters workerIgnition="`cat worker.ign | base64`" \
+  --parameters workerIgnition="$WORKER_IGNITION" \
   --parameters sshKeyData="$SSH_KEY"
 ```
 
-### Approve the worker CSRs
+#### Approve the worker CSRs
 
 Even after they've booted up, the workers will not show up in `oc get nodes`.
 
@@ -445,12 +511,82 @@ node02     Ready    worker   2m35s   v1.14.6+cebabbf7a
 node03     Ready    worker   2m34s   v1.14.6+cebabbf7a
 ```
 
+#### Add the Ingress DNS Records
+
+Depending on the [ingress endpoint publishing strategy](#ingress-endpoint-publishing-strategy) you chose to use, the DNS records to be created for the ingress load balancer will be different.
+Use A, CNAME, etc. records, as you see fit. Also, you can create either a wildcard `*.apps.{baseDomain}.` or [specific records](#specific-route-records) for every route.
+
+##### LoadBalancerService strategy
+
+If you're using the *AWS LoadBalancerService* (default) strategy, create DNS records pointing at the ingress load balancer.
+
+First, wait for the ingress default router to create a load balancer and populate the EXTERNAL-IP column:
+
+```console
+$ oc -n openshift-ingress get service router-default
+NAME             TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)                      AGE
+router-default   LoadBalancer   172.30.20.10   35.130.120.110   80:32288/TCP,443:31215/TCP   20
+```
+
+Add records to the public and private DNS zones:
+
+```sh
+export PUBLIC_IP_ROUTER=`oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}'`
+
+az network dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_ROUTER
+
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_ROUTER
+```
+
+##### HostNetwork strategy
+
+If you're using the *HostNetwork* strategy, create DNS records pointing at the load balancer manually created in the deployments.
+
+```sh
+export PUBLIC_IP_INFRA=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-infra-pip'] | [0].ipAddress" -o tsv`
+
+az network dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_INFRA
+
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_INFRA
+```
+
+##### Specific route records
+
+If you prefer to add explicit domains instead of using a wildcard, you can create entries for each of the cluster's current routes. Use the command below to check what they are:
+
+```console
+$ oc get --all-namespaces -o jsonpath='{range .items[*]}{range .status.ingress[*]}{.host}{"\n"}{end}{end}' routes
+oauth-openshift.apps.cluster.basedomain.com
+console-openshift-console.apps.cluster.basedomain.com
+downloads-openshift-console.apps.cluster.basedomain.com
+alertmanager-main-openshift-monitoring.apps.cluster.basedomain.com
+grafana-openshift-monitoring.apps.cluster.basedomain.com
+prometheus-k8s-openshift-monitoring.apps.cluster.basedomain.com
+```
+
 ### Wait for the installation complete
 
 Wait until cluster is ready:
 
-```sh
-openshift-install wait-for install-complete --log-level debug
+```console
+$ openshift-install wait-for install-complete --log-level debug
+DEBUG Built from commit 6b629f0c847887f22c7a95586e49b0e2434161ca
+INFO Waiting up to 30m0s for the cluster at https://api.cluster.basedomain.com:6443 to initialize...
+DEBUG Still waiting for the cluster to initialize: Working towards 4.2.12: 99% complete, waiting on authentication, console, monitoring
+DEBUG Still waiting for the cluster to initialize: Working towards 4.2.12: 100% complete
+DEBUG Cluster is initialized
+INFO Waiting up to 10m0s for the openshift-console route to be created...
+DEBUG Route found in openshift-console namespace: console
+DEBUG Route found in openshift-console namespace: downloads
+DEBUG OpenShift console route is created
+INFO Install complete!
+INFO To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=${PWD}/auth/kubeconfig'
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.cluster.basedomain.com
+INFO Login to the console with user: kubeadmin, password: REDACTED
 ```
 
 [azuretemplates]: https://docs.microsoft.com/en-us/azure/azure-resource-manager/template-deployment-overview
@@ -460,3 +596,7 @@ openshift-install wait-for install-complete --log-level debug
 [yqyaml]: https://yq.readthedocs.io/en/latest/
 [ingress-operator]: https://github.com/openshift/cluster-ingress-operator
 [machine-api-operator]: https://github.com/openshift/machine-api-operator
+[azure-identity]: https://docs.microsoft.com/en-us/azure/architecture/framework/security/identity
+[azure-resource-group]: https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/overview#resource-groups
+[azure-dns]: https://docs.microsoft.com/en-us/azure/dns/dns-overview
+[kubernetes-service-load-balancers-exclude-masters]: https://github.com/kubernetes/kubernetes/issues/65618
