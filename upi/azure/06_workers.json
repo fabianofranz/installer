@@ -113,7 +113,7 @@
       {
         "name" : "vmNames",
         "count" :  "[parameters('numberOfNodes')]",
-        "input" : "[concat(resourceGroup().name, '-worker-', variables('location'), '-', padLeft(copyIndex('vmNames', 1), 2, '0'))]"
+        "input" : "[concat(resourceGroup().name, '-worker-', variables('location'), '-', copyIndex('vmNames', 1))]"
       }
     ]
   },
@@ -158,7 +158,7 @@
               "properties" : {
                 "ipConfigurations" : [
                   {
-                    "name" : "ipconfig1",
+                    "name" : "pipConfig",
                     "properties" : {
                       "privateIPAllocationMethod" : "Dynamic",
                       "subnet" : {
@@ -214,11 +214,11 @@
                     "id": "[resourceId('Microsoft.Compute/images', concat(resourceGroup().name, '-image'))]"
                   },
                   "osDisk" : {
-                    "name": "[concat(variables('vmNames')[copyIndex()],'-osdisk')]",
+                    "name": "[concat(variables('vmNames')[copyIndex()],'_OSDisk')]",
                     "osType" : "Linux",
                     "createOption" : "FromImage",
                     "managedDisk": {
-                      "storageAccountType": "Standard_LRS"
+                      "storageAccountType": "Premium_LRS"
                     }
                   },
                   "dataDisks": [

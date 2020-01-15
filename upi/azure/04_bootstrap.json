@@ -97,7 +97,7 @@
     "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
-    "masterLoadBalancerName" : "[concat(resourceGroup().name, '-master-lb')]",
+    "masterLoadBalancerName" : "[concat(resourceGroup().name, '-public-lb')]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "masterAvailabilitySetID" : "[resourceId('Microsoft.Compute/availabilitySets', variables('masterAvailabilitySetName'))]",
     "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
@@ -132,7 +132,7 @@
       "properties" : {
         "ipConfigurations" : [
           {
-            "name" : "ipconfig1",
+            "name" : "pipConfig",
             "properties" : {
               "privateIPAllocationMethod" : "Dynamic",
               "subnet" : {
@@ -140,7 +140,7 @@
               },
               "loadBalancerBackendAddressPools" : [
                 {
-                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/master-lb-backend')]"
+                  "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/public-lb-backend')]"
                 },
                 {
                   "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('internalLoadBalancerName'), '/backendAddressPools/internal-lb-backend')]"
@@ -194,12 +194,13 @@
             "id": "[resourceId('Microsoft.Compute/images', variables('imageName'))]"
           },
           "osDisk" : {
-            "name": "[concat(variables('vmName'),'-osdisk')]",
+            "name": "[concat(variables('vmName'),'_OSDisk')]",
             "osType" : "Linux",
             "createOption" : "FromImage",
             "managedDisk": {
-              "storageAccountType": "Standard_LRS"
-            }
+              "storageAccountType": "Premium_LRS"
+            },
+            "diskSizeGB" : 100
           },
           "dataDisks": [
             {
