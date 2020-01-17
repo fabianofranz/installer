@@ -108,7 +108,6 @@
     "masterLoadBalancerName" : "[concat(resourceGroup().name, '-public-lb')]",
     "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
-    "controlPlaneNsgName" : "[concat(resourceGroup().name, '-controlplane-nsg')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "identityName" : "[concat(resourceGroup().name,'-identity')]",
     "copy" : [
@@ -173,10 +172,7 @@
                       ]
                     }
                   }
-                ],
-                "networkSecurityGroup" : {
-                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('controlPlaneNsgName'))]"
-                }
+                ]
               }
             },
             {

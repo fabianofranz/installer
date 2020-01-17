@@ -107,7 +107,6 @@
     "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
     "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
-    "nodeNsgName" : "[concat(resourceGroup().name, '-node-nsg')]",
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "copy" : [
       {
@@ -171,10 +170,7 @@
                       ]
                     }
                   }
-                ],
-                "networkSecurityGroup" : {
-                  "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nodeNsgName'))]"
-                }
+                ]
               }
             },
             {
