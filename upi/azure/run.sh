@@ -23,12 +23,12 @@ python3 setup-manifests.py $RESOURCE_GROUP
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-python -c '
-import yaml;
-path = "manifests/cluster-scheduler-02-config.yml"
-data = yaml.load(open(path));
-data["spec"]["mastersSchedulable"] = False;
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+# python -c '
+# import yaml;
+# path = "manifests/cluster-scheduler-02-config.yml"
+# data = yaml.load(open(path), Loader=yaml.BaseLoader);
+# data["spec"]["mastersSchedulable"] = False;
+# open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 # cat > manifests/ingress-controller-02-default.yaml <<EOF
 # apiVersion: operator.openshift.io/v1
@@ -56,8 +56,8 @@ az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${C
 export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-name ${CLUSTER_NAME}sa --query "[0].value" -o tsv`
 
 # export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-42.80.20191002.0.vhd"
-# export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.201912131630.0-azure.x86_64.vhd"
-export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
+export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.201912131630.0-azure.x86_64.vhd"
+# export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
 
 az storage container create --name vhd --account-name ${CLUSTER_NAME}sa
 az storage blob copy start --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY --destination-blob "rhcos.vhd" --destination-container vhd --source-uri "$VHD_URL"
@@ -73,7 +73,6 @@ az storage blob upload --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_K
 export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv`
 
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e false
 
 export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
 export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
@@ -81,6 +80,8 @@ az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scop
 
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "01_vpc.json"
+
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-network-link -v "${RESOURCE_GROUP}-vnet" -e false
 
 # TODO
 # az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN} --resolution-vnets "${RESOURCE_GROUP}-vnet" --zone-type Private

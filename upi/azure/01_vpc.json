@@ -85,7 +85,7 @@
       "properties" : {
         "securityRules" : [
           {
-            "name" : "default-allow-openshift-master",
+            "name" : "apiserver_in",
             "properties" : {
               "protocol" : "Tcp",
               "sourcePortRange" : "*",
@@ -116,7 +116,8 @@
       "type" : "Microsoft.Network/routeTables",
       "name" : "[variables('nodeRouteTableName')]",
       "apiVersion" : "2018-10-01",
-      "location" : "[variables('location')]"
+      "location" : "[variables('location')]",
+      "properties" : {}
     }
   ]
 }

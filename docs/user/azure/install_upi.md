@@ -108,7 +108,7 @@ Update the scheduler configuration to keep router pods and other workloads off t
 python -c '
 import yaml;
 path = "manifests/cluster-scheduler-02-config.yml"
-data = yaml.load(open(path));
+data = yaml.load(open(path), Loader=yaml.BaseLoader);
 data["spec"]["mastersSchedulable"] = False;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 ```
@@ -281,11 +281,10 @@ Create the new public DNS zone:
 az network dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
-Create the private zone and link it to the cluster VNet:
+Create the private zone:
 
 ```sh
 az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-private-dns-vnet -v "${RESOURCE_GROUP}-vnet" -e false
 ```
 
 ### Grant access to the identity (optional)
@@ -310,6 +309,12 @@ next steps we're going to deploy each one of them in order, using [az (Azure CLI
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
   --template-file "01_vpc.json"
+```
+
+Link the VNet just created to the private DNS zone:
+
+```sh
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-network-link -v "${RESOURCE_GROUP}-vnet" -e false
 ```
 
 ### Deploy the image

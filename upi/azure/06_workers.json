@@ -25,7 +25,7 @@
     },
     "nodeVMSize" : {
       "type" : "string",
-      "defaultValue" : "Standard_D8_v3",
+      "defaultValue" : "Standard_D4s_v3",
       "allowedValues" : [
         "Standard_A2",
         "Standard_A3",
@@ -95,7 +95,7 @@
         "Standard_D8s_v3"
       ],
       "metadata" : {
-        "description" : "The size of the each Node Virtual Machine."
+        "description" : "The size of the each Node Virtual Machine"
       }
     }
   },
@@ -138,7 +138,7 @@
               "name": "[concat(variables('vmNames')[copyIndex()],'-datadisk1')]",
               "location" : "[variables('location')]",
               "sku": {
-                "name": "Standard_LRS"
+                "name": "Premium_LRS"
               },
               "properties": {
                 "creationData": {

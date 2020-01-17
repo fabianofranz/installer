@@ -25,7 +25,7 @@
     },
     "masterVMSize" : {
       "type" : "string",
-      "defaultValue" : "Standard_D8_v3",
+      "defaultValue" : "Standard_D8s_v3",
       "allowedValues" : [
         "Standard_A2",
         "Standard_A3",
@@ -95,7 +95,7 @@
         "Standard_D8s_v3"
       ],
       "metadata" : {
-        "description" : "The size of the Master Virtual Machine."
+        "description" : "The size of the Master Virtual Machines"
       }
     }
   },
@@ -140,7 +140,7 @@
               "name": "[concat(variables('vmNames')[copyIndex()], '-datadisk1')]",
               "location" : "[variables('location')]",
               "sku": {
-                "name": "Standard_LRS"
+                "name": "Premium_LRS"
               },
               "properties": {
                 "creationData": {
@@ -165,7 +165,6 @@
                       },
                       "loadBalancerBackendAddressPools" : [
                         {
-                          "name" : "",
                           "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('masterLoadBalancerName'), '/backendAddressPools/public-lb-backend')]"
                         },
                         {
