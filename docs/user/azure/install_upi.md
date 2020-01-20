@@ -110,6 +110,7 @@ import yaml;
 path = "manifests/cluster-scheduler-02-config.yml"
 data = yaml.load(open(path), Loader=yaml.BaseLoader);
 data["spec"]["mastersSchedulable"] = False;
+data["metadata"]["creationTimestamp"] = None
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 ```
 
@@ -197,7 +198,6 @@ resource group name, but feel free to choose any other name and export it in the
 which will be used in the subsequent steps.
 
 ```sh
-
 az group create --name $RESOURCE_GROUP --location $AZURE_REGION
 az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
 ```
@@ -213,11 +213,11 @@ export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-na
 
 #### Copy the cluster image
 
-Choose the RHCOS version you'd like to use and export the URL of its Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) to an environment variable. For example, to use the latest 4.2 version
+Choose the RHCOS version you'd like to use and export the URL of its Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) to an environment variable. For example, to use the latest 4.3 version
 available at the time of this writing, use:
 
 ```sh
-export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.201912131630.0-azure.x86_64.vhd"
+export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.202001142154.0-azure.x86_64.vhd"
 ```
 
 If you'd just like to use the latest version available, use:
@@ -340,7 +340,7 @@ Create DNS records for the public load balancer. If your public DNS zone doesn't
 export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${CLUSTER_NAME}-master-pip'] | [0].ipAddress" -o tsv`
 
 az network dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
-az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP
+az network dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP --ttl 60
 ```
 
 Create private DNS records for the internal load balancer:

@@ -29,9 +29,9 @@ with open('manifests/cloud-provider-config.yaml') as file:
     config.resourceGroup = resource_group
     config.vnetName = resource_group + "-vnet"
     config.vnetResourceGroup = resource_group
-    config.subnetName = resource_group + "-master-subnet"
-    config.securityGroupName = resource_group + "-controlplane-nsg"
-    config.routeTableName = ""
+    config.subnetName = resource_group + "-node-subnet"
+    config.securityGroupName = resource_group + "-node-nsg"
+    config.routeTableName = resource_group + "-node-routetable"
     config.azure_resourcegroup = resource_group
     jsondata = json.dumps(dict(**config.toDict()), indent='\t')
     jsonstr = str(jsondata)
@@ -48,6 +48,9 @@ with open('manifests/cluster-infrastructure-02-config.yml') as file:
     file.close()
     yamlx['status']['platformStatus']['azure']['resourceGroupName'] = resource_group
     yamlx['status']['platformStatus']['azure']['networkResourceGroupName'] = resource_group
+    yamlx['status']['platformStatus']['azure']['virtualNetwork'] = resource_group + "-vnet"
+    yamlx['status']['platformStatus']['azure']['controlPlaneSubnet'] = resource_group + "-master-subnet"
+    yamlx['status']['platformStatus']['azure']['computeSubnet'] = resource_group + "-node-subnet"
     yamlx['status']['infrastructureName'] = resource_group
     yamlx['metadata']['creationTimestamp'] = None
     with open('manifests/cluster-infrastructure-02-config.yml', 'w') as outfile:

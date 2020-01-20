@@ -51,7 +51,7 @@
               "networkSecurityGroup" : {
                 "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nodeNsgName'))]"
               }
-            },
+            }
           }
         ]
       }
@@ -115,7 +115,21 @@
       "apiVersion" : "2018-10-01",
       "location" : "[variables('location')]",
       "properties" : {
-        "securityRules" : []
+        "securityRules" : [
+          {
+            "name" : "apiserver_in",
+            "properties" : {
+              "protocol" : "Tcp",
+              "sourcePortRange" : "*",
+              "destinationPortRange" : "6443",
+              "sourceAddressPrefix" : "*",
+              "destinationAddressPrefix" : "*",
+              "access" : "Allow",
+              "priority" : 101,
+              "direction" : "Inbound"
+            }
+          }
+        ]
       }
     },
     {
