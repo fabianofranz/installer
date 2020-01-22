@@ -7,9 +7,8 @@ export CLUSTER_NAME=`yq -r .metadata.name install-config.yaml`
 export AZURE_REGION=`yq -r .platform.azure.region install-config.yaml`
 export SSH_KEY=`yq -r .sshKey install-config.yaml | xargs`
 export BASE_DOMAIN=`yq -r .baseDomain install-config.yaml`
+export BASE_DOMAIN_RESOURCE_GROUP=`yq -r .platform.azure.baseDomainResourceGroupName install-config.yaml`
 export RESOURCE_GROUP=$CLUSTER_NAME
-
-read -p "pause"
 
 python -c '
 import yaml;
@@ -24,27 +23,6 @@ python3 setup-manifests.py $RESOURCE_GROUP
 
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
-
-python -c '
-import yaml;
-path = "manifests/cluster-scheduler-02-config.yml"
-data = yaml.load(open(path), Loader=yaml.BaseLoader);
-data["spec"]["mastersSchedulable"] = False;
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-
-# cat > manifests/ingress-controller-02-default.yaml <<EOF
-# apiVersion: operator.openshift.io/v1
-# kind: IngressController
-# metadata:
-#   finalizers:
-#   - ingresscontroller.operator.openshift.io/finalizer-ingresscontroller
-#   name: default
-#   namespace: openshift-ingress-operator
-# spec:
-#   endpointPublishingStrategy:
-#     type: HostNetwork
-#   replicas: 3
-# EOF
 
 openshift-install create ignition-configs
 
@@ -97,9 +75,8 @@ export PUBLIC_IP=`az network public-ip list -g $RESOURCE_GROUP --query "[?name==
 echo
 echo "Public IP: ${PUBLIC_IP}"
 
-read -p "Create the public DNS entries then press [ENTER] to continue..."
-# az network dns record-set a create -g os4-common -z ${BASE_DOMAIN} -n "api.${CLUSTER_NAME}" --ttl 60
-# az network dns record-set a add-record -g os4-common -z ${BASE_DOMAIN} -n "api.${CLUSTER_NAME}" -a $PUBLIC_IP --ttl 60
+az network dns record-set a create -g $BASE_DOMAIN_RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api --ttl 60
+az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n api -a $PUBLIC_IP --ttl 60
 
 export INTERNAL_LB_IP=`az network lb frontend-ip show -g $RESOURCE_GROUP --lb-name ${RESOURCE_GROUP}-internal-lb -n internal-lb-ip --query "privateIpAddress" -o tsv`
 
@@ -149,6 +126,8 @@ openshift-install wait-for bootstrap-complete --log-level debug
 az vm stop -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
 az vm deallocate -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
 az vm delete -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap --no-wait --yes
+az disk delete -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap_OSDisk --no-wait --yes
+az network nic delete -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap-nic --no-wait
 az storage blob delete --account-key $ACCOUNT_KEY --account-name ${CLUSTER_NAME}sa --container-name files --name bootstrap.ign
 
 export KUBECONFIG="$PWD/auth/kubeconfig"
@@ -167,20 +146,15 @@ oc get csr -A
 echo
 read -p "Approve the certificate signing requests (CSRs) then press [ENTER] to continue..."
 
-oc -n openshift-ingress get service router-default
-
 export PUBLIC_IP_ROUTER=`oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}'`
 
 echo
 echo "Public router IP: ${PUBLIC_IP_ROUTER}"
 
-echo
-read -p "Wait until the IP for the public router is available, create the DNS entries for it then press [ENTER] to continue..."
+az network dns record-set a create -g $BASE_DOMAIN_RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_ROUTER
 
-# az network dns record-set a create -g os4-common -z ${BASE_DOMAIN} -n "*.apps.${CLUSTER_NAME}" --ttl 30
-# az network dns record-set a add-record -g os4-common -z ${BASE_DOMAIN} -n "*.apps.${CLUSTER_NAME}" -a $PUBLIC_IP_ROUTER --ttl 30
-
-# az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 30
-# az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_ROUTER
+az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
+az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $PUBLIC_IP_ROUTER
 
 openshift-install wait-for install-complete --log-level debug

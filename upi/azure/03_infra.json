@@ -11,10 +11,6 @@
     "masterPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('masterPublicIpAddressName'))]",
     "masterLoadBalancerName" : "[concat(resourceGroup().name, '-public-lb')]",
     "masterLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
-    "infraPublicIpAddressName" : "[concat(resourceGroup().name, '-infra-pip')]",
-    "infraPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('infraPublicIpAddressName'))]",
-    "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
-    "infraLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('infraLoadBalancerName'))]",
     "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "internalLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('internalLoadBalancerName'))]",
     "skuName": "Standard"
