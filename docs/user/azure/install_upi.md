@@ -49,7 +49,7 @@ export BASE_DOMAIN_RESOURCE_GROUP=`yq -r .platform.azure.baseDomainResourceGroup
 export RESOURCE_GROUP=$CLUSTER_NAME
 ```
 
-## Empty the compute pool
+### Empty the compute pool
 
 We'll be providing the compute machines ourselves, so edit the resulting `install-config.yaml` to set `replicas` to 0 for the `compute` pool:
 
@@ -159,7 +159,7 @@ openshift-vw4j5
 
 ## Create The Resource Group and identity
 
-All resources created in this Azure deployment will exist as part of a [resource group](azure-resource-group). Use the commands
+All resources created in this Azure deployment will exist as part of a [resource group][azure-resource-group]. Use the commands
 below to create it in the selected Azure region. In this example we're going to use the cluster name as the unique
 resource group name, but feel free to choose any other name and export it in the `RESOURCE_GROUP` environment variable,
 which will be used in the subsequent steps.
@@ -176,7 +176,8 @@ az identity create -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity
 
 ## Upload the files to a Storage Account
 
-The deployment steps will read the RHCOS VHD image and the bootstrap ignition config file from a blob. Create a storage account that will be used to store them and export its key as an environment variable.
+The deployment steps will read the Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) image and the bootstrap ignition config file
+from a blob. Create a storage account that will be used to store them and export its key as an environment variable.
 
 ```sh
 az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name ${CLUSTER_NAME}sa --kind Storage --sku Standard_LRS
@@ -185,7 +186,7 @@ export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-na
 
 ### Copy the cluster image
 
-Given the size of the Red Hat Enterprise Linux CoreOS virtual hard disk (VHD), it's not possible to run the deployments with this file stored locally on your machine.
+Given the size of the RHCOS VHD, it's not possible to run the deployments with this file stored locally on your machine.
 We must copy and store it in a storage container instead. To do so, first create a blob storage container and then copy the VHD.
 
 Choose the RHCOS version you'd like to use and export the URL of its VHD to an environment variable. For example, to use the latest release available for the 4.3 version, use:
@@ -243,7 +244,7 @@ export BOOTSTRAP_URL=`az storage blob url --account-name ${CLUSTER_NAME}sa --acc
 
 A few DNS records are required for clusters that use user-provisioned infrastructure. Feel free to choose the DNS strategy that fits you best.
 
-In this example we're going to use [Azure's own DNS solution](azure-dns), so we're going to create a new public DNS zone for external (internet) visibility, and
+In this example we're going to use [Azure's own DNS solution][azure-dns], so we're going to create a new public DNS zone for external (internet) visibility, and
 a private DNS zone for internal cluster resolution. Note that the public zone don't necessarily need to exist in the same resource group of the
 cluster deployment itself and may even already exist in your organization for the desired base domain. If that's the case, you can skip the public DNS
 zone creation step, but make sure the install config generated earlier [reflects that scenario](customization.md#cluster-scoped-properties).
@@ -263,7 +264,7 @@ az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_
 
 ## Grant access to the identity
 
-Grant the *Contributor* role to the Azure identity so that the Ingress Operator can create a public IP and update the load balancers. You can do that with:
+Grant the *Contributor* role to the Azure identity so that the Ingress Operator can create a public IP and its load balancer. You can do that with:
 
 ```sh
 export PRINCIPAL_ID=`az identity show -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}-identity --query principalId --out tsv`
