@@ -31,7 +31,8 @@ with open('manifests/cloud-provider-config.yaml') as file:
     config.vnetResourceGroup = resource_group
     config.subnetName = resource_group + "-node-subnet"
     config.securityGroupName = resource_group + "-node-nsg"
-    config.routeTableName = resource_group + "-node-routetable"
+    config.routeTableName = ""
+    config.cloudProviderRateLimit = False
     config.azure_resourcegroup = resource_group
     jsondata = json.dumps(dict(**config.toDict()), indent='\t')
     jsonstr = str(jsondata)

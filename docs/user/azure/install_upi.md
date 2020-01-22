@@ -213,14 +213,13 @@ export ACCOUNT_KEY=`az storage account keys list -g $RESOURCE_GROUP --account-na
 
 #### Copy the cluster image
 
-Choose the RHCOS version you'd like to use and export the URL of its Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) to an environment variable. For example, to use the latest 4.3 version
-available at the time of this writing, use:
+Choose the RHCOS version you'd like to use and export the URL of its Red Hat Enterprise Linux CoreOS virtual hard disk (VHD) to an environment variable. For example, to use the latest release available for the 4.3 version, use:
 
 ```sh
-export VHD_URL="https://rhcos.blob.core.windows.net/imagebucket/rhcos-43.81.202001142154.0-azure.x86_64.vhd"
+export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/release-4.3/data/data/rhcos.json | jq -r .azure.url`
 ```
 
-If you'd just like to use the latest version available, use:
+If you'd just like to use the latest _development_ version available (master branch), use:
 
 ```sh
 export VHD_URL=`curl -s https://raw.githubusercontent.com/openshift/installer/master/data/data/rhcos.json | jq -r .azure.url`
@@ -375,6 +374,9 @@ az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_N
 
 az network private-dns record-set srv create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp --ttl 60
 az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t bootstrap-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
+az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
 ### Launch the permanent control plane
@@ -401,10 +403,6 @@ az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-0 -a $MASTER0_IP
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-1 -a $MASTER1_IP
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n etcd-2 -a $MASTER2_IP
-
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}
-az network private-dns record-set srv add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n _etcd-server-ssl._tcp -r 2380 -p 0 -w 10 -t etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}
 ```
 
 ### Wait for the bootstrap complete
@@ -430,7 +428,8 @@ Once the bootstrapping process is complete you can deallocate and delete bootstr
 
 ```sh
 az vm stop -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
-az vm deallocate -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap --no-wait
+az vm deallocate -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap
+az vm delete -g $RESOURCE_GROUP --name ${RESOURCE_GROUP}-bootstrap --no-wait --yes
 az storage blob delete --account-key $ACCOUNT_KEY --account-name ${CLUSTER_NAME}sa --container-name files --name bootstrap.ign
 ```
 

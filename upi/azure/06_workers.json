@@ -106,8 +106,9 @@
     "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
     "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
     "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
-    "infraLoadBalancerName" : "[concat(resourceGroup().name, '-infra-lb')]",
-    "sshKeyPath" : "/home/core/.ssh/authorized_keys",
+    "infraLoadBalancerName" : "[resourceGroup().name]",
+    "sshKeyPath" : "/home/capi/.ssh/authorized_keys",
+    "identityName" : "[concat(resourceGroup().name,'-identity')]",
     "copy" : [
       {
         "name" : "vmNames",
@@ -133,27 +134,9 @@
           "resources" : [
             {
               "apiVersion" : "2018-06-01",
-              "type": "Microsoft.Compute/disks",
-              "name": "[concat(variables('vmNames')[copyIndex()],'-datadisk1')]",
-              "location" : "[variables('location')]",
-              "sku": {
-                "name": "Premium_LRS"
-              },
-              "properties": {
-                "creationData": {
-                  "createOption": "Empty"
-                },
-                "diskSizeGB": 128
-              }
-            },
-            {
-              "apiVersion" : "2018-06-01",
               "type" : "Microsoft.Network/networkInterfaces",
               "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
               "location" : "[variables('location')]",
-              "tags" : {
-                "displayName" : "NetworkInterface"
-              },
               "properties" : {
                 "ipConfigurations" : [
                   {
@@ -165,7 +148,7 @@
                       },
                       "loadBalancerBackendAddressPools" : [
                         {
-                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('infraLoadBalancerName'), '/backendAddressPools/infra-lb-backend')]"
+                          "id" : "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.Network/loadBalancers/', variables('infraLoadBalancerName'), '/backendAddressPools/', resourceGroup().name)]"
                         }
                       ]
                     }
@@ -179,11 +162,16 @@
               "name" : "[variables('vmNames')[copyIndex()]]",
               "location" : "[variables('location')]",
               "tags" : {
-                "displayName" : "VirtualMachine"
+                "kubernetes.io-cluster-ffranzupi": "owned"
+              },
+              "identity" : {
+                "type" : "userAssigned",
+                "userAssignedIdentities" : {
+                  "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('identityName'))]" : {}
+                }
               },
               "dependsOn" : [
-                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]",
-                "[concat('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()], '-datadisk1'))]"
+                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]"
               ],
               "properties" : {
                 "hardwareProfile" : {
@@ -191,7 +179,7 @@
                 },
                 "osProfile" : {
                   "computerName" : "[variables('vmNames')[copyIndex()]]",
-                  "adminUsername" : "core",
+                  "adminUsername" : "capi",
                   "customData" : "[parameters('workerIgnition')]",
                   "linuxConfiguration" : {
                     "disablePasswordAuthentication" : true,
@@ -215,23 +203,17 @@
                     "createOption" : "FromImage",
                     "managedDisk": {
                       "storageAccountType": "Premium_LRS"
-                    }
-                  },
-                  "dataDisks": [
-                    {
-                      "lun": 0,
-                      "name": "[concat(variables('vmNames')[copyIndex()],'-datadisk1')]",
-                      "createOption": "attach",
-                      "managedDisk": {
-                        "id": "[resourceId('Microsoft.Compute/disks/', concat(variables('vmNames')[copyIndex()],'-datadisk1'))]"
-                      }
-                    }
-                  ]
+                    },
+                    "diskSizeGB": 128
+                  }
                 },
                 "networkProfile" : {
                   "networkInterfaces" : [
                     {
-                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]"
+                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]",
+                      "properties": {
+                        "primary": true
+                      }
                     }
                   ]
                 },

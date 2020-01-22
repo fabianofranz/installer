@@ -21,9 +21,6 @@
       "type" : "Microsoft.Network/virtualNetworks",
       "name" : "[variables('virtualNetworkName')]",
       "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "VirtualNetwork"
-      },
       "dependsOn" : [
         "[concat('Microsoft.Network/networkSecurityGroups/', variables('controlPlaneNsgName'))]",
         "[concat('Microsoft.Network/networkSecurityGroups/', variables('nodeNsgName'))]"
@@ -39,6 +36,7 @@
             "name" : "[variables('masterSubnetName')]",
             "properties" : {
               "addressPrefix" : "[variables('masterSubnetPrefix')]",
+              "serviceEndpoints": [],
               "networkSecurityGroup" : {
                 "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('controlPlaneNsgName'))]"
               }
@@ -48,6 +46,7 @@
             "name" : "[variables('nodeSubnetName')]",
             "properties" : {
               "addressPrefix" : "[variables('nodeSubnetPrefix')]",
+              "serviceEndpoints": [],
               "networkSecurityGroup" : {
                 "id" : "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nodeNsgName'))]"
               }
@@ -83,9 +82,6 @@
     {
       "type" : "Microsoft.Network/networkSecurityGroups",
       "name" : "[variables('controlPlaneNsgName')]",
-      "tags" : {
-        "displayName" : "NetworkSecurityGroup"
-      },
       "apiVersion" : "2018-10-01",
       "location" : "[variables('location')]",
       "properties" : {
@@ -99,7 +95,7 @@
               "sourceAddressPrefix" : "*",
               "destinationAddressPrefix" : "*",
               "access" : "Allow",
-              "priority" : 2000,
+              "priority" : 101,
               "direction" : "Inbound"
             }
           }
@@ -109,9 +105,6 @@
     {
       "type" : "Microsoft.Network/networkSecurityGroups",
       "name" : "[variables('nodeNsgName')]",
-      "tags" : {
-        "displayName" : "NetworkSecurityGroup"
-      },
       "apiVersion" : "2018-10-01",
       "location" : "[variables('location')]",
       "properties" : {

@@ -25,9 +25,6 @@
       "type" : "Microsoft.Network/publicIPAddresses",
       "name" : "[variables('masterPublicIpAddressName')]",
       "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "OpenShiftMasterPublicIP"
-      },
       "sku": {
         "name": "[variables('skuName')]"
       },
@@ -40,30 +37,9 @@
     },
     {
       "apiVersion" : "2018-12-01",
-      "type" : "Microsoft.Network/publicIPAddresses",
-      "name" : "[variables('infraPublicIpAddressName')]",
-      "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "OpenShiftInfraLBPublicIP"
-      },
-      "sku": {
-        "name": "[variables('skuName')]"
-      },
-      "properties" : {
-        "publicIPAllocationMethod" : "Static",
-        "dnsSettings" : {
-          "domainNameLabel" : "[variables('infraPublicIpAddressName')]"
-        }
-      }
-    },
-    {
-      "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('masterLoadBalancerName')]",
       "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "OpenShiftMasterLB"
-      },
       "sku": {
         "name": "[variables('skuName')]"
       },
@@ -97,7 +73,7 @@
                 "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/public-lb-backend')]"
               },
               "protocol" : "Tcp",
-              "loadDistribution" : "SourceIP",
+              "loadDistribution" : "Default",
               "idleTimeoutInMinutes" : 30,
               "frontendPort" : 6443,
               "backendPort" : 6443,
@@ -123,99 +99,8 @@
     {
       "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/loadBalancers",
-      "name" : "[variables('infraLoadBalancerName')]",
-      "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "appLB"
-      },
-      "sku": {
-        "name": "[variables('skuName')]"
-      },
-      "dependsOn" : [
-        "[concat('Microsoft.Network/publicIPAddresses/', variables('infraPublicIpAddressName'))]"
-      ],
-      "properties" : {
-        "frontendIPConfigurations" : [
-          {
-            "name" : "infra-lb-ip",
-            "properties" : {
-              "publicIPAddress" : {
-                "id" : "[variables('infraPublicIpAddressID')]"
-              }
-            }
-          }
-        ],
-        "backendAddressPools" : [
-          {
-            "name" : "infra-lb-backend"
-          }
-        ],
-        "loadBalancingRules" : [
-          {
-            "name" : "OpenShiftRouterHTTP",
-            "properties" : {
-              "frontendIPConfiguration" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/frontendIPConfigurations/infra-lb-ip')]"
-              },
-              "backendAddressPool" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/backendAddressPools/infra-lb-backend')]"
-              },
-              "protocol" : "Tcp",
-              "frontendPort" : 80,
-              "backendPort" : 80,
-              "probe" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/probes/infra-lb-http-probe')]"
-              }
-            }
-          },
-          {
-            "name" : "OpenShiftRouterHTTPS",
-            "properties" : {
-              "frontendIPConfiguration" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/frontendIPConfigurations/infra-lb-ip')]"
-              },
-              "backendAddressPool" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/backendAddressPools/infra-lb-backend')]"
-              },
-              "protocol" : "Tcp",
-              "frontendPort" : 443,
-              "backendPort" : 443,
-              "probe" : {
-                "id" : "[concat(variables('infraLoadBalancerID'), '/probes/infra-lb-https-probe')]"
-              }
-            }
-          }
-        ],
-        "probes" : [
-          {
-            "name" : "infra-lb-http-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 80,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
-            }
-          },
-          {
-            "name" : "infra-lb-https-probe",
-            "properties" : {
-              "protocol" : "Tcp",
-              "port" : 443,
-              "intervalInSeconds" : 5,
-              "numberOfProbes" : 2
-            }
-          }
-        ]
-      }
-    },
-    {
-      "apiVersion" : "2018-12-01",
-      "type" : "Microsoft.Network/loadBalancers",
       "name" : "[variables('internalLoadBalancerName')]",
       "location" : "[variables('location')]",
-      "tags" : {
-        "displayName" : "OpenShiftIntLB"
-      },
       "sku": {
         "name": "[variables('skuName')]"
       },
@@ -247,7 +132,7 @@
               "frontendPort" : 6443,
               "backendPort" : 6443,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 4,
+              "idleTimeoutInMinutes" : 30,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
@@ -268,7 +153,7 @@
               "frontendPort" : 22623,
               "backendPort" : 22623,
               "enableFloatingIP" : false,
-              "idleTimeoutInMinutes" : 4,
+              "idleTimeoutInMinutes" : 30,
               "protocol" : "Tcp",
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
