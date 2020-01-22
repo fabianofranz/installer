@@ -6,10 +6,8 @@
     "virtualNetworkName" : "[concat(resourceGroup().name, '-vnet')]",
     "addressPrefix" : "10.0.0.0/16",
     "masterSubnetName" : "[concat(resourceGroup().name, '-master-subnet')]",
-    "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "masterSubnetPrefix" : "10.0.0.0/24",
     "nodeSubnetName" : "[concat(resourceGroup().name, '-node-subnet')]",
-    "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
     "nodeSubnetPrefix" : "10.0.1.0/24",
     "controlPlaneNsgName" : "[concat(resourceGroup().name, '-controlplane-nsg')]",
     "nodeNsgName" : "[concat(resourceGroup().name, '-node-nsg')]"
@@ -52,30 +50,6 @@
             }
           }
         ]
-      }
-    },
-    {
-      "apiVersion" : "2018-10-01",
-      "type" : "Microsoft.Compute/availabilitySets",
-      "name" : "[variables('masterAvailabilitySetName')]",
-      "location" : "[variables('location')]",
-      "properties": {
-        "platformFaultDomainCount": 3
-      },
-      "sku": {
-        "name" : "Aligned"
-      }
-    },
-    {
-      "apiVersion" : "2018-10-01",
-      "type" : "Microsoft.Compute/availabilitySets",
-      "name" : "[variables('nodeAvailabilitySetName')]",
-      "location" : "[variables('location')]",
-      "properties": {
-        "platformFaultDomainCount": 3
-      },
-      "sku": {
-        "name" : "Aligned"
       }
     },
     {

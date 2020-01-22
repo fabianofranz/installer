@@ -11,11 +11,37 @@
     "masterPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('masterPublicIpAddressName'))]",
     "masterLoadBalancerName" : "[concat(resourceGroup().name, '-public-lb')]",
     "masterLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
+    "masterAvailabilitySetName" : "[concat(resourceGroup().name, '-master-availability-set')]",
     "internalLoadBalancerName" : "[concat(resourceGroup().name, '-internal-lb')]",
     "internalLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('internalLoadBalancerName'))]",
+    "nodeAvailabilitySetName" : "[concat(resourceGroup().name, '-node-availability-set')]",
     "skuName": "Standard"
   },
   "resources" : [
+    {
+      "apiVersion" : "2018-10-01",
+      "type" : "Microsoft.Compute/availabilitySets",
+      "name" : "[variables('masterAvailabilitySetName')]",
+      "location" : "[variables('location')]",
+      "properties": {
+        "platformFaultDomainCount": 3
+      },
+      "sku": {
+        "name" : "Aligned"
+      }
+    },
+    {
+      "apiVersion" : "2018-10-01",
+      "type" : "Microsoft.Compute/availabilitySets",
+      "name" : "[variables('nodeAvailabilitySetName')]",
+      "location" : "[variables('location')]",
+      "properties": {
+        "platformFaultDomainCount": 3
+      },
+      "sku": {
+        "name" : "Aligned"
+      }
+    },
     {
       "apiVersion" : "2018-12-01",
       "type" : "Microsoft.Network/publicIPAddresses",

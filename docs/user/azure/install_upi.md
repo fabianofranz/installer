@@ -126,8 +126,7 @@ After running the command, several files will be available in the directory.
 ```console
 $ tree
 .
-├── 01_vpc.json
-├── 02_infra.json
+├── 01_vnet.json
 ├── 02_storage.json
 ├── 03_infra.json
 ├── 04_bootstrap.json
@@ -278,11 +277,15 @@ The key part of this UPI deployment are the [Azure Resource Manager][azuretempla
 for deploying most resources. They're provided as a few json files named following the "NN_name.json" pattern. In the
 next steps we're going to deploy each one of them in order, using [az (Azure CLI)][azurecli] and providing the expected parameters.
 
-## Deploy the VPC
+## Deploy the Virtual Network
+
+In this example we're going to create a Virtual Network and subnets specifically for the OpenShift cluster. You can skip this step
+if the cluster is going to live in a VNet already existing in your organization, or you can edit the `01_vnet.json` file to your
+own needs (e.g. change the subnets address prefixes in CIDR format).
 
 ```sh
 az group deployment create -g $RESOURCE_GROUP \
-  --template-file "01_vpc.json"
+  --template-file "01_vnet.json"
 ```
 
 Link the VNet just created to the private DNS zone:

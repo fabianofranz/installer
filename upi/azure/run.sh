@@ -57,7 +57,7 @@ export RESOURCE_GROUP_ID=`az group show -g $RESOURCE_GROUP --query id --out tsv`
 az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scope "$RESOURCE_GROUP_ID"
 
 az group deployment create -g $RESOURCE_GROUP \
-  --template-file "01_vpc.json"
+  --template-file "01_vnet.json"
 
 az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${CLUSTER_NAME}-network-link -v "${RESOURCE_GROUP}-vnet" -e false
 
